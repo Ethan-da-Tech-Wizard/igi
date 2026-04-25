@@ -20,7 +20,7 @@
 ## 4. User Interface & Interaction
 * **4.1 Minimalist Search Overlay:** Immediately after the OCR extraction completes (or concurrently), a frameless, borderless, always-on-top Qt `QWidget` must appear on screen containing a single, dark-mode text input field.
 * **4.2 Real-Time Fuzzy Search:** As the user types into the search bar, the application must execute a fuzzy search algorithm (e.g., Levenshtein distance or Bitap) against the in-memory text array.
-* **4.3 Semantic Matching:** The search algorithm must account for minor OCR errors (e.g., mistaking 'l' for '1') and return matches with a confidence score > 90%.
+* **4.3 Fuzzy Matching:** The search algorithm must account for minor OCR errors (e.g., mistaking 'l' for '1') and return matches whose normalized Levenshtein score exceeds the configured threshold (default `0.85` — see `docs/DECISIONS.md` D-001). The matcher is lexical, not embedding-based; "semantic" search is explicitly out of scope.
 * **4.4 Dynamic Highlighting:** When a match is found, the application must spawn a transparent Qt overlay that precisely draws a semi-transparent yellow polygon directly over the screen coordinates `(x, y, width, height)` of the matched word.
 
 ## 5. Teardown & Security Constraints

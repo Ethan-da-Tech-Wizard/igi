@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: macos-14
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew update
+          brew install cmake qt tesseract leptonica mupdf pkg-config
+
+      - name: Export Qt and pkg-config paths
+        run: |
+          QT_PREFIX="$(brew --prefix qt)"
+          echo "CMAKE_PREFIX_PATH=${QT_PREFIX}" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$(brew --prefix tesseract)/lib/pkgconfig:$(brew --prefix leptonica)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - name: Configure
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        working-directory: build
+        run: ctest --output-on-failure

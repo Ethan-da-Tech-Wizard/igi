@@ -15,7 +15,7 @@ When triggered—either via a global system hotkey or by launching the minimalis
 
 1. **Contextual Ingestion:** Seamlessly capture the visual state of the currently active window directly into volatile RAM via Qt screen capture. If the active window is detected as a native PDF viewer, instantly intercept the file path and stream the document directly into memory via MuPDF.
 2. **High-Performance Processing:** Utilize a highly optimized, multi-threaded C++ OCR engine to map visual text to screen coordinates with near-zero latency.
-3. **Minimalist Overlay:** Present an ultra-minimalist, floating search bar that semantically matches the user's query and physically draws a visual highlight over the target word on their screen.
+3. **Minimalist Overlay:** Present an ultra-minimalist, floating search bar that fuzzy-matches the user's query against the OCR'd text and physically draws a visual highlight over the target word on their screen.
 4. **Zero-Storage Architecture:** Purge all visual data and text arrays from memory the exact millisecond the search is closed or completed. 
 
-By strictly prohibiting temporary files, caches, and disk writes, this architecture guarantees a 100% offline, highly secure, and strictly HIPAA-compliant search experience.
+By strictly prohibiting temporary files, caches, and disk writes (note: reading user-opened files and the bundled Tesseract model is allowed — see `docs/DECISIONS.md` D-007), this architecture delivers a fully offline, HIPAA-aligned search experience suitable for organizations whose policies forbid third-party storage of PHI. Final HIPAA compliance remains a property of the deploying organization's overall safeguards, not Igi alone.

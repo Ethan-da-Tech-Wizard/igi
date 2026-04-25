@@ -8,26 +8,39 @@ To maintain a highly optimized, modular, and strictly organized C++ codebase, th
 igi/
 ├── CMakeLists.txt                 # Master C++ build configuration & dependency linker
 ├── README.md                      # High-level project overview & quickstart
+├── .github/
+│   └── workflows/
+│       └── ci.yml                 # macos-14 CI: cmake configure, build, ctest
 ├── docs/                          # Comprehensive Engineering Documentation Suite
 │   ├── ARCHITECTURE.md            # Mermaid component maps and sequence flowcharts
+│   ├── CHUNKSTONES                # 8-chunk engineering breakdown
+│   ├── DECISIONS.md               # Binding technical decisions log (D-001 ...)
 │   ├── FRD.md                     # Functional Requirements Document
 │   ├── PIPELINE_DIAGRAMS.md       # Visual logic and system boundaries
 │   ├── PRD.md                     # Product Requirements Document
 │   ├── PROBLEM_STATEMENT.md       # Core problem definition and solution constraints
-│   ├── SCOPE_AND_MILESTONES.md    # Strict scope boundaries and 5-phase engineering plan
-│   └── REPOSITORY_STRUCTURE.md    # This master blueprint file
-├── assets/                        # Static application assets (icons, system tray logos)
-├── build/                         # Ephemeral CMake build outputs (ignored in version control)
+│   ├── REPOSITORY_STRUCTURE.md    # This master blueprint file
+│   ├── RISK_REGISTER.md           # Security, performance, engineering, UX risks + mitigations
+│   ├── SCOPE_AND_MILESTONES.md    # Strict scope boundaries and engineering plan
+│   └── SRD.md                     # System Requirements Document
+├── assets/                        # Static application assets (icons, QSS stylesheets)
+├── build/                         # Ephemeral CMake build outputs (gitignored)
+├── tests/                         # GoogleTest unit + integration suite
+│   ├── CMakeLists.txt             # FetchContent-pinned GoogleTest, gtest_discover_tests
+│   ├── smoke_test.cpp             # Build-pipeline smoke test
+│   └── daemon_test.cpp            # Q_OBJECT/AUTOMOC verification + Daemon lifecycle
 └── src/                           # Core C++ Application Source Code
     ├── main.cpp                   # Application entry point, Qt loop, & daemon initialization
     │
     ├── core/                      # Daemon & macOS System Integrations
-    │   ├── HotkeyListener.h       # macOS accessibility hotkey API definitions
-    │   ├── HotkeyListener.cpp     # macOS Carbon event loop & `Cmd+Shift+F` trigger logic
-    │   ├── ScreenCapture.h        # Qt QScreen integration definitions
-    │   └── ScreenCapture.cpp      # Logic for active-window pixel extraction to QPixmap
+    │   ├── Daemon.h               # Q_OBJECT daemon lifecycle (start/stop, signals)
+    │   ├── Daemon.cpp             # Daemon implementation
+    │   ├── HotkeyListener.h       # IHotkeyListener interface (Chunk 1)
+    │   ├── HotkeyListener.mm      # NSEvent global monitor primary; Carbon fallback (DECISIONS.md D-004)
+    │   ├── ScreenCapture.h        # Qt QScreen integration definitions (Chunk 2)
+    │   └── ScreenCapture.cpp      # Logic for active-window pixel extraction to QPixmap (Chunk 2)
     │
-    ├── ocr/                       # Tesseract, MuPDF & Leptonica Processing Pipeline
+    ├── ocr/                       # Tesseract, MuPDF & Leptonica Processing Pipeline (Chunks 3, 6)
     │   ├── OcrEngine.h            # Tesseract lifecycle manager
     │   ├── OcrEngine.cpp          # Tesseract Init() and Recognize() execution logic
     │   ├── PdfEngine.h            # MuPDF file-path ingestion definitions
@@ -35,12 +48,12 @@ igi/
     │   ├── ImageConverter.h       # Format conversion definitions
     │   └── ImageConverter.cpp     # QPixmap to Leptonica PIX memory-safe byte conversion
     │
-    ├── search/                    # Volatile Data Lookup & Mathematical Algorithms
-    │   ├── FuzzySearch.h          # Levenshtein/Bitap algorithm definitions
-    │   ├── FuzzySearch.cpp        # Real-time >90% confidence matching execution
+    ├── search/                    # Volatile Data Lookup & Mathematical Algorithms (Chunk 4a)
+    │   ├── FuzzySearch.h          # Levenshtein algorithm definitions
+    │   ├── FuzzySearch.cpp        # Threshold-based fuzzy matching (DECISIONS.md D-001)
     │   └── BoundingBox.h          # Volatile data struct for [String, X, Y, W, H] mapping
     │
-    └── ui/                        # Qt User Interface & Visual Rendering
+    └── ui/                        # Qt User Interface & Visual Rendering (Chunks 4b, 5)
         ├── SearchOverlay.h        # Frameless, floating input bar definitions
         ├── SearchOverlay.cpp      # Dark-mode styling, focus rules, and keystroke events
         ├── HighlightOverlay.h     # Transparent full-screen polygon definitions
@@ -49,5 +62,6 @@ igi/
 
 ## Architectural Rules
 1. **Module Independence:** Files in `src/ui/` are not permitted to directly execute Tesseract code. They must only interface with the volatile arrays generated by `src/search/`.
-2. **Memory Responsibility:** Any class that allocates a `QPixmap` or a Leptonica `PIX` array (primarily within `src/ocr/` and `src/core/`) is strictly responsible for explicitly defining C++ destructors to instantly free that memory.
-3. **No File Headers:** No code in this repository may invoke `<fstream>` or standard file-write operations for caching visual data.
+2. **Memory Responsibility:** Any class that allocates a `QPixmap` or a Leptonica `PIX` array (primarily within `src/ocr/` and `src/core/`) is strictly responsible for explicitly defining C++ destructors (typically via RAII smart pointers with custom deleters) to free that memory deterministically.
+3. **No Disk Writes:** No code in this repository may invoke `<fstream>` write operations, `mkstemp`, or any other write syscall against captured visual data or extracted text. Reads of user-opened files (PDF) and the bundled `tessdata` are explicitly allowed (see `DECISIONS.md` D-007).
+4. **Library/Executable Split:** All non-`main` logic lives in the `igi_core` static library (built from `src/`) so the test suite can link the same translation units that ship in the binary.

@@ -49,7 +49,7 @@ graph TD
 ---
 
 ## 2. The Microsecond Execution Sequence
-This sequence diagram illustrates the exact chronological workflow of a search operation. It highlights the strict initialization and destruction phases required to maintain HIPAA compliance.
+This sequence diagram illustrates the exact chronological workflow of a search operation. It highlights the strict initialization and destruction phases required to support HIPAA-aligned workflows (see `docs/DECISIONS.md` D-007 for the read/write boundary).
 
 ```mermaid
 sequenceDiagram

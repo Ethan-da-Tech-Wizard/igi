@@ -8,7 +8,7 @@
 * **Active Context Capture:** It must seamlessly capture the visual state of the currently active window or user-defined screen region.
 * **Instantaneous OCR Engine:** Visual data must be processed into searchable text arrays with near-zero latency.
 * **Minimalist Overlay UI:** A dark-mode, floating search bar that does not obstruct the user's workflow. It must draw a physical highlight polygon over the matched word directly on the screen.
-* **Zero-Storage Architecture (HIPAA Compliant):** The tool must process all visual and text data strictly in volatile RAM. It is explicitly prohibited from writing caches, temporary files, or transmitting data to the internet. All memory is purged upon closing the search.
+* **Zero-Write Architecture (HIPAA-Aligned):** The tool must process all visual and text data strictly in volatile RAM. It is explicitly prohibited from writing caches, temporary files, or transmitting data to the internet. All memory is purged upon closing the search. *Note: HIPAA compliance is an organizational/policy property, not an application property — Igi is designed to be **compatible with** HIPAA workflows by eliminating the data-residency vectors a deploying organization would otherwise need to police, but compliance itself depends on the deploying organization's policies, BAAs, and controls.*
 
 ## 3. Technology Stack
 * **Language:** C++17

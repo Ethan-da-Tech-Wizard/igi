@@ -35,7 +35,7 @@ To prevent scope creep and ensure adherence to the ultra-low latency, zero-stora
 * **Goal:** Establish the application as a background listener capable of grabbing pixels.
 * **Tasks:**
   1. Configure the Qt application loop to run headlessly.
-  2. Integrate macOS `Carbon` or `ApplicationServices` frameworks to register the `Cmd+Shift+F` global hotkey.
+  2. Register the `Cmd+Shift+F` global hotkey via `NSEvent.addGlobalMonitorForEventsMatchingMask` (primary). Carbon's `RegisterEventHotKey` is retained as a compiled fallback only (see `docs/DECISIONS.md` D-004).
   3. Implement `QScreen::grabWindow` to capture the active window into a volatile `QPixmap` when the hotkey is fired.
 
 ### ⏳ Milestone 3: The Data Pipeline (OCR & MuPDF Integration)
