@@ -1,9 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
-project(IgiOCR VERSION 1.0 LANGUAGES CXX)
+project(IgiOCR VERSION 1.0 LANGUAGES CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(CMAKE_OBJCXX_STANDARD 17)
+set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -23,6 +26,21 @@ pkg_check_modules(LEPTONICA REQUIRED lept)
 add_library(igi_core STATIC
     src/core/Daemon.cpp
 )
+
+# macOS-only: Objective-C++ sources for system framework integrations.
+if(APPLE)
+    target_sources(igi_core PRIVATE
+        src/core/AppPolicy.mm
+        src/core/HotkeyListener.mm
+        src/core/Permissions.mm
+    )
+
+    target_link_libraries(igi_core PUBLIC
+        "-framework AppKit"
+        "-framework Carbon"
+        "-framework ApplicationServices"
+    )
+endif()
 
 target_include_directories(igi_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
