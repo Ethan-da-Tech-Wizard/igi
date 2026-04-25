@@ -1,12 +1,4 @@
-include(FetchContent)
-
-FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG        v1.14.0
-)
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+find_package(GTest REQUIRED)
 
 add_executable(igi_smoke_test
     main.cpp
@@ -15,11 +7,14 @@ add_executable(igi_smoke_test
     hotkey_listener_test.cpp
 )
 
+find_package(Qt6 REQUIRED COMPONENTS Test)
+
 # Use GTest::gtest (not gtest_main) because we supply our own main()
 # that initialises QCoreApplication before running tests, which is
 # required for QSignalSpy and any other Qt primitives used in tests.
 target_link_libraries(igi_smoke_test PRIVATE
     igi_core
+    Qt6::Test
     GTest::gtest
     GTest::gmock
 )
