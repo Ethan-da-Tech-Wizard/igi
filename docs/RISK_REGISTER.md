@@ -9,7 +9,7 @@ This document identifies potential technical, security, and operational risks as
 | ID | Risk Description | Probability | Impact | Mitigation Strategy |
 |:---|:---|:---:|:---:|:---|
 | **SEC-01** | **macOS Page Swapping (RAM to Disk)** <br> The operating system automatically swaps volatile memory (containing the captured screen pixels) to the physical hard drive (swap file) under heavy memory pressure, violating the zero-storage mandate. | Low | High | Utilize macOS `mlock()` and `madvise()` API calls to explicitly lock the memory pages containing `QPixmap` and Tesseract arrays, preventing the OS from writing them to swap storage. |
-| **SEC-02** | **Memory Dump Exploitation** <br> A malicious background process or malware accesses Igi's allocated heap memory before the C++ destructor can purge it. | Low | High | Ensure Igi runs strictly in User Space. Implement instant zeroing (`memset(0)`) of pixel arrays immediately after OCR extraction finishes, minimizing the window of vulnerability to mere milliseconds. |
+| **SEC-02** | **Memory Dump Exploitation** <br> A malicious background process or malware accesses Igi's allocated heap memory before the C++ destructor can purge it. | Low | High | Ensure Igi runs strictly in User Space. Use `explicit_bzero(ptr, len)` (or a `volatile` overwrite loop) — **not** `memset(0)`, which the optimizer is allowed to elide on dead memory — to wipe pixel arrays and OCR strings immediately after they are no longer needed. See `docs/DECISIONS.md` D-006. |
 | **SEC-03** | **Revoked Screen Recording Permissions** <br> The user or enterprise IT policy revokes macOS Screen Recording permissions, completely breaking the Qt capture engine. | Med | High | Implement a startup check utilizing `CGPreflightScreenCaptureAccess()`. If access is denied, spawn a polite Qt dialogue routing the user to System Settings rather than crashing the daemon. |
 
 ## 2. Performance & Memory Risks
@@ -23,7 +23,7 @@ This document identifies potential technical, security, and operational risks as
 
 | ID | Risk Description | Probability | Impact | Mitigation Strategy |
 |:---|:---|:---:|:---:|:---|
-| **ENG-01** | **Apple API Deprecation** <br> Apple completely deprecates the legacy `Carbon.framework` or `ApplicationServices` used for global hotkey registration in macOS 15+. | Med | High | Abstract the Hotkey Listener into its own interface (`IHotkeyListener`). If Apple deprecates Carbon, we only rewrite the internal implementation using modern `NSEvent` global monitors without touching the rest of the codebase. |
+| **ENG-01** | **Apple API Deprecation** <br> Apple soft-deprecates `Carbon.framework` further in macOS 15+. | Med | High | Mitigated preemptively (`docs/DECISIONS.md` D-004): the **primary** hotkey path uses `NSEvent.addGlobalMonitorForEventsMatchingMask`. Carbon's `RegisterEventHotKey` is retained behind the same `IHotkeyListener` interface as a compiled fallback only. |
 | **ENG-02** | **Compiler Dependency Hell** <br> Developers attempting to compile Tesseract/MuPDF on older macOS versions encounter C++ macro failures (e.g., the `crau_data` bug). | High | High | Strictly enforce the "Xcode 15.2+" compiler requirement established in the SRD. Long-term: bundle pre-compiled Universal binary dependencies (`.a` / `.dylib`) directly into the repository to bypass source-builds entirely. |
 
 ## 4. Accuracy & UI Constraints

@@ -1,11 +1,17 @@
 # Build outputs
 build/
+build-*/
+cmake-build-*/
 CMakeCache.txt
 CMakeFiles/
+CMakeUserPresets.json
 cmake_install.cmake
+compile_commands.json
 Makefile
 *.o
+*.obj
 *.a
+*.so
 *.dylib
 *.app/
 
@@ -18,3 +24,5 @@ Makefile
 .vscode/
 .idea/
 *.swp
+*.xcodeproj/
+*.xcworkspace/

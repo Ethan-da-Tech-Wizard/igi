@@ -3,7 +3,7 @@
 ## 1. Operating System Specifications
 * **Target OS:** macOS 13 (Ventura) or newer.
 * **Architecture Support:** Universal Binary. The C++ application must compile for both Apple Silicon (ARM64) and Intel (x86_64) architectures to support a wide range of Mac hardware.
-* **OS Integrations:** The application must securely integrate with the macOS `ApplicationServices.framework` and `Carbon.framework` to register low-level global system hotkeys.
+* **OS Integrations:** The application registers a global hotkey primarily via `NSEvent.addGlobalMonitorForEventsMatchingMask` (AppKit). `Carbon.framework`'s `RegisterEventHotKey` is retained as a compiled fallback only (see `docs/DECISIONS.md` D-004). Also requires the macOS Accessibility entitlement for global event monitoring.
 * **Permissions:** The application requires explicit user authorization for **Screen Recording Permissions** (via System Settings > Privacy & Security) to execute the active-window capture API.
 
 ## 2. Hardware Constraints
