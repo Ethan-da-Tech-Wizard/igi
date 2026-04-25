@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           brew update
-          brew install cmake qt tesseract leptonica mupdf pkg-config
+          brew install cmake qt tesseract leptonica mupdf pkg-config googletest
 
       - name: Export Qt and pkg-config paths
         run: |
