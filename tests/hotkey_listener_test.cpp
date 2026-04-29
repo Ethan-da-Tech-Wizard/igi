@@ -105,19 +105,35 @@ TEST(HotkeyListener, RegistrationFailureDoesNotCrashDaemon) {
     EXPECT_FALSE(daemon.hotkeyActive());
 }
 
-TEST(HotkeyListener, PermissionsMissingSignalFiresWhenDenied) {
+TEST(HotkeyListener, PermissionsCheckedSignalFiresOnEveryStart) {
     auto* raw = new MockHotkeyListener();
-    EXPECT_CALL(*raw, registerHotkey(_)).WillOnce(Return(false));
-    EXPECT_CALL(*raw, isRegistered()).WillRepeatedly(Return(false));
+    EXPECT_CALL(*raw, registerHotkey(_)).WillOnce(Return(true));
+    EXPECT_CALL(*raw, isRegistered()).WillRepeatedly(Return(true));
     EXPECT_CALL(*raw, unregisterHotkey()).Times(1);
 
     Daemon daemon(std::unique_ptr<IHotkeyListener>(raw));
-    QSignalSpy spy(&daemon, &Daemon::permissionsMissing);
+    QSignalSpy spy(&daemon, &Daemon::permissionsChecked);
 
     daemon.start();
 
-    // In a CI environment without perms granted, the signal should fire.
-    // We can't assert count==1 here since preflightPermissions() may return
-    // true on a permissioned dev machine — just assert it doesn't crash.
-    EXPECT_GE(spy.count(), 0);
+    // permissionsChecked is design-spec'd to fire exactly once per start(),
+    // regardless of whether perms are granted or denied — that's how
+    // subscribers (like main.cpp's dialog) decide whether to act.
+    EXPECT_EQ(spy.count(), 1);
+    EXPECT_EQ(spy[0].size(), 2) << "signal must carry the (screen, ax) pair";
+}
+
+TEST(HotkeyListener, RepeatedStartDoesNotRefirePermissionsCheck) {
+    auto* raw = new MockHotkeyListener();
+    EXPECT_CALL(*raw, registerHotkey(_)).WillOnce(Return(true));
+    EXPECT_CALL(*raw, isRegistered()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*raw, unregisterHotkey()).Times(1);
+
+    Daemon daemon(std::unique_ptr<IHotkeyListener>(raw));
+    QSignalSpy spy(&daemon, &Daemon::permissionsChecked);
+
+    daemon.start();
+    daemon.start();  // idempotent — should not re-run preflight
+
+    EXPECT_EQ(spy.count(), 1);
 }
