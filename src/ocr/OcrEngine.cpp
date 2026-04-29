@@ -5,6 +5,8 @@
 #include <tesseract/baseapi.h>
 #include <leptonica/allheaders.h>
 
+#include "search/FuzzySearch.h"
+
 namespace igi::ocr {
 
 OcrEngine::OcrEngine()
@@ -69,9 +71,12 @@ QFuture<std::vector<search::WordBox>> OcrEngine::recognizeAsync(PixPtr image, in
                 int left, top, right, bottom;
                 if (it->BoundingBox(level, &left, &top, &right, &bottom)) {
                     float confidence = it->Confidence(level);
+                    QString text = QString::fromUtf8(wordText);
+                    QString norm = igi::search::FuzzySearch::normalize(text);
                     
                     results.emplace_back(
-                        QString::fromUtf8(wordText),
+                        text,
+                        norm,
                         left,
                         top,
                         right - left,
