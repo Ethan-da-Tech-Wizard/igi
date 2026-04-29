@@ -9,7 +9,15 @@ Daemon::Daemon(std::unique_ptr<IHotkeyListener> listener, QObject* parent)
     , listener_(listener ? std::move(listener) : IHotkeyListener::create())
 {}
 
-Daemon::~Daemon() = default;
+Daemon::~Daemon() {
+    // Ensure the OS hotkey is released even if the daemon is destroyed
+    // while running (e.g., abnormal shutdown). We do not call stop()
+    // here because it would emit `stopped` during destruction, which is
+    // unsafe for any receiver whose lifetime is tied to this Daemon.
+    if (listener_) {
+        listener_->unregisterHotkey();
+    }
+}
 
 QString Daemon::version() const {
     return QStringLiteral("0.1.0-chunk1");
@@ -50,9 +58,7 @@ void Daemon::checkAndWirePermissions() {
                       "Open System Settings > Privacy & Security > Accessibility.";
     }
 
-    if (!permissions_.allGranted()) {
-        emit permissionsMissing(permissions_.screenRecording, permissions_.accessibility);
-    }
+    emit permissionsChecked(permissions_.screenRecording, permissions_.accessibility);
 
     // Attempt hotkey registration regardless — on denial the listener returns
     // false and isRegistered() stays false. We log but do not crash.

@@ -15,27 +15,37 @@ A conceptual visualization of the high-performance OCR data pipeline.
 
 
 ### Strict Logic Flow (Engineering Standard)
-This is the actual, programmed logic representing how the C++ application bypasses the hard drive and multi-threads the 112-page document.
+This is the programmed logic representing how the C++ application stays in memory and parallelises page-level OCR for multi-page PDFs.
+
+> **Note on parallelism:** SIMD (single-instruction multiple-data, e.g.,
+> AVX/NEON intrinsics) is *not* the same as thread-level parallelism. SIMD
+> operates on multiple data elements within a single CPU instruction;
+> threads run independent instruction streams. Igi parallelises **per
+> page** via a bounded `QThreadPool` of OCR workers. Tesseract itself uses
+> SIMD internally inside `Recognize()`, but Igi does not slice pixels
+> across cores. See `docs/CHUNKSTONES` Chunk 6 for the concrete worker-pool
+> design.
 
 ```mermaid
 flowchart TD
     A[Global Hotkey Trigger] --> B{Detect Active Window}
     B -->|Browser/App| C1(Qt Screen Region Capture)
-    B -->|PDF Viewer| C2(Detect Open File Path)
-    
-    C1 -->|Visual Data Array| D{SIMD Multithreading Split}
-    C2 -->|C++ mmap| C3(MuPDF Memory Loader)
-    C3 --> D
-    D -->|Thread 1| D1[Core 1: Pages/Frames 1-25]
-    D -->|Thread 2| D2[Core 2: Pages/Frames 26-50]
-    D -->|Thread 3| D3[Core 3: Pages/Frames 51-75]
-    D -->|Thread 4| D4[Core 4: Pages/Frames 76-112]
-    
-    D1 & D2 & D3 & D4 --> E(Tesseract Engine)
-    E --> F[(Volatile RAM Data Array)]
-    
-    F --> G{User Clicks 'Next' Navigation}
-    G --> H[Qt UI Instantly Renders Page 55 Overlay from RAM]
+    B -->|PDF Viewer| C2(Detect Open File Path via AX API)
+
+    C1 -->|QPixmap| F[QImage to PIX Converter]
+    C2 -->|fz_open_document| C3(MuPDF Page Renderer)
+    C3 -->|fz_pixmap per page| F
+
+    F -->|PIX| Q[Bounded OCR Worker Pool<br/>N = hardware_concurrency - 1]
+    Q -->|task: 1 page| W1[Worker: Tesseract Recognize page i]
+    Q -->|task: 1 page| W2[Worker: Tesseract Recognize page j]
+    Q -->|task: 1 page| W3[Worker: Tesseract Recognize page k]
+
+    W1 & W2 & W3 --> R[(Volatile WordBox Vector<br/>text + x,y,w,h + page index)]
+
+    R --> G{User types in search bar}
+    G --> H[Fuzzy match returns top-K matches]
+    H --> J[Render highlight polygon on the matched word's screen coordinates]
 ```
 
 ---

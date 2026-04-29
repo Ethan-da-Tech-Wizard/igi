@@ -36,7 +36,11 @@ signals:
     void started();
     void stopped();
     void hotkeyTriggered();
-    void permissionsMissing(bool screenRecording, bool accessibility);
+    // Fires once per start() after preflight, with the granted state of each
+    // permission. Subscribers decide what to do (e.g., show a dialog if any
+    // are missing). Naming is neutral on purpose — both the "all granted"
+    // and "something missing" listeners use the same payload.
+    void permissionsChecked(bool screenRecordingGranted, bool accessibilityGranted);
 
 private:
     void checkAndWirePermissions();

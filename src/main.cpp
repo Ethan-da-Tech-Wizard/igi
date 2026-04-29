@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
     // This call handles the case where the binary is run directly without
     // an app bundle.
 #if defined(Q_OS_MACOS)
-    extern void igi_set_activation_policy_accessory();
+    extern "C" void igi_set_activation_policy_accessory();
     igi_set_activation_policy_accessory();
 #endif
 
@@ -36,9 +36,14 @@ int main(int argc, char* argv[]) {
 
     igi::core::Daemon daemon;
 
-    // Surface missing-permissions to the user with a non-blocking dialog.
-    QObject::connect(&daemon, &igi::core::Daemon::permissionsMissing,
-        [](bool screenOk, bool axOk) {
+    // Surface permission state to the user with a non-blocking dialog
+    // when something is missing. The signal fires on every preflight,
+    // so we filter here.
+    QObject::connect(&daemon, &igi::core::Daemon::permissionsChecked,
+        [](bool screenGranted, bool axGranted) {
+            if (screenGranted && axGranted) {
+                return;
+            }
             QMessageBox* box = new QMessageBox(QMessageBox::Warning,
                 QStringLiteral("Igi — Permissions Required"),
                 QStringLiteral(
@@ -49,14 +54,14 @@ int main(int argc, char* argv[]) {
                     "System Settings."),
                 QMessageBox::NoButton);
 
-            if (!screenOk) {
+            if (!screenGranted) {
                 QPushButton* btn = box->addButton(
                     QStringLiteral("Open Screen Recording Settings"),
                     QMessageBox::ActionRole);
                 QObject::connect(btn, &QPushButton::clicked,
                     [] { igi::core::openScreenRecordingSettings(); });
             }
-            if (!axOk) {
+            if (!axGranted) {
                 QPushButton* btn = box->addButton(
                     QStringLiteral("Open Accessibility Settings"),
                     QMessageBox::ActionRole);
