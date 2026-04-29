@@ -33,6 +33,7 @@ add_library(igi_core STATIC
     src/core/ScreenGeometry.cpp
     src/ocr/ImageConverter.cpp
     src/ocr/OcrEngine.cpp
+    src/search/FuzzySearch.cpp
 )
 
 # macOS-only: Objective-C++ sources for system framework integrations.
