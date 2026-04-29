@@ -9,6 +9,10 @@
 #include "core/Daemon.h"
 #include "core/Permissions.h"
 
+#if defined(Q_OS_MACOS)
+extern "C" void igi_set_activation_policy_accessory();
+#endif
+
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
 
@@ -17,7 +21,6 @@ int main(int argc, char* argv[]) {
     // This call handles the case where the binary is run directly without
     // an app bundle.
 #if defined(Q_OS_MACOS)
-    extern "C" void igi_set_activation_policy_accessory();
     igi_set_activation_policy_accessory();
 #endif
 
