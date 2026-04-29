@@ -34,4 +34,6 @@ jobs:
 
       - name: Test
         working-directory: build
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: ctest --output-on-failure
