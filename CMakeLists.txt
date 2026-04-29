@@ -19,7 +19,7 @@ set(CMAKE_AUTOUIC ON)
 
 option(IGI_BUILD_TESTS "Build the Igi unit test suite" ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Concurrent)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(TESSERACT REQUIRED tesseract)
@@ -32,6 +32,7 @@ add_library(igi_core STATIC
     src/core/Daemon.cpp
     src/core/ScreenGeometry.cpp
     src/ocr/ImageConverter.cpp
+    src/ocr/OcrEngine.cpp
 )
 
 # macOS-only: Objective-C++ sources for system framework integrations.
@@ -65,6 +66,7 @@ target_link_libraries(igi_core PUBLIC
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    Qt6::Concurrent
     ${TESSERACT_LIBRARIES}
     ${LEPTONICA_LIBRARIES}
 )
