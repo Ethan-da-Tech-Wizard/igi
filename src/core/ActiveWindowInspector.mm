@@ -1,5 +1,9 @@
 #include "core/ActiveWindowInspector.h"
 
+#include <QRect>
+#include <QString>
+#include <QUrl>
+
 #import <AppKit/AppKit.h>
 #import <ApplicationServices/ApplicationServices.h>
 
@@ -51,8 +55,8 @@ bool copyAxRect(AXUIElementRef element, QRect& out) {
 
     CGPoint pos{};
     CGSize  size{};
-    AXValueGetValue(static_cast<AXValueRef>(posVal), kAXValueCGPointType, &pos);
-    AXValueGetValue(static_cast<AXValueRef>(sizeVal), kAXValueCGSizeType, &size);
+    AXValueGetValue(static_cast<AXValueRef>(posVal), static_cast<AXValueType>(kAXValueCGPointType), &pos);
+    AXValueGetValue(static_cast<AXValueRef>(sizeVal), static_cast<AXValueType>(kAXValueCGSizeType), &size);
     CFRelease(posVal);
     CFRelease(sizeVal);
 

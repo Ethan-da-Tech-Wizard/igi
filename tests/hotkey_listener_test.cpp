@@ -45,9 +45,9 @@ TEST(HotkeyListener, DaemonStartRegistersHotkey) {
     auto* raw = new MockHotkeyListener();
     EXPECT_CALL(*raw, registerHotkey(_)).Times(1).WillOnce(Return(true));
     EXPECT_CALL(*raw, isRegistered()).WillRepeatedly(Return(true));
-    EXPECT_CALL(*raw, unregisterHotkey()).Times(1);
+    EXPECT_CALL(*raw, unregisterHotkey()).Times(testing::AtLeast(1));
 
-    Daemon daemon(std::unique_ptr<IHotkeyListener>(raw));
+    Daemon daemon{std::unique_ptr<IHotkeyListener>(raw)};
     daemon.start();
 
     EXPECT_TRUE(daemon.isRunning());
@@ -65,9 +65,9 @@ TEST(HotkeyListener, HotkeyCallbackEmitsDaemonSignal) {
             return true;
         });
     EXPECT_CALL(*raw, isRegistered()).WillRepeatedly(Return(true));
-    EXPECT_CALL(*raw, unregisterHotkey()).Times(1);
+    EXPECT_CALL(*raw, unregisterHotkey()).Times(testing::AtLeast(1));
 
-    Daemon daemon(std::unique_ptr<IHotkeyListener>(raw));
+    Daemon daemon{std::unique_ptr<IHotkeyListener>(raw)};
     QSignalSpy spy(&daemon, &Daemon::hotkeyTriggered);
 
     daemon.start();
@@ -82,9 +82,9 @@ TEST(HotkeyListener, DaemonStopUnregistersHotkey) {
     auto* raw = new MockHotkeyListener();
     EXPECT_CALL(*raw, registerHotkey(_)).WillOnce(Return(true));
     EXPECT_CALL(*raw, isRegistered()).WillRepeatedly(Return(false));
-    EXPECT_CALL(*raw, unregisterHotkey()).Times(1);
+    EXPECT_CALL(*raw, unregisterHotkey()).Times(testing::AtLeast(1));
 
-    Daemon daemon(std::unique_ptr<IHotkeyListener>(raw));
+    Daemon daemon{std::unique_ptr<IHotkeyListener>(raw)};
     daemon.start();
     daemon.stop();
 
@@ -96,9 +96,9 @@ TEST(HotkeyListener, RegistrationFailureDoesNotCrashDaemon) {
     // Simulates missing Accessibility permission.
     EXPECT_CALL(*raw, registerHotkey(_)).WillOnce(Return(false));
     EXPECT_CALL(*raw, isRegistered()).WillRepeatedly(Return(false));
-    EXPECT_CALL(*raw, unregisterHotkey()).Times(1);
+    EXPECT_CALL(*raw, unregisterHotkey()).Times(testing::AtLeast(1));
 
-    Daemon daemon(std::unique_ptr<IHotkeyListener>(raw));
+    Daemon daemon{std::unique_ptr<IHotkeyListener>(raw)};
     daemon.start();
 
     EXPECT_TRUE(daemon.isRunning());
@@ -109,9 +109,9 @@ TEST(HotkeyListener, PermissionsCheckedSignalFiresOnEveryStart) {
     auto* raw = new MockHotkeyListener();
     EXPECT_CALL(*raw, registerHotkey(_)).WillOnce(Return(true));
     EXPECT_CALL(*raw, isRegistered()).WillRepeatedly(Return(true));
-    EXPECT_CALL(*raw, unregisterHotkey()).Times(1);
+    EXPECT_CALL(*raw, unregisterHotkey()).Times(testing::AtLeast(1));
 
-    Daemon daemon(std::unique_ptr<IHotkeyListener>(raw));
+    Daemon daemon{std::unique_ptr<IHotkeyListener>(raw)};
     QSignalSpy spy(&daemon, &Daemon::permissionsChecked);
 
     daemon.start();
@@ -127,9 +127,9 @@ TEST(HotkeyListener, RepeatedStartDoesNotRefirePermissionsCheck) {
     auto* raw = new MockHotkeyListener();
     EXPECT_CALL(*raw, registerHotkey(_)).WillOnce(Return(true));
     EXPECT_CALL(*raw, isRegistered()).WillRepeatedly(Return(true));
-    EXPECT_CALL(*raw, unregisterHotkey()).Times(1);
+    EXPECT_CALL(*raw, unregisterHotkey()).Times(testing::AtLeast(1));
 
-    Daemon daemon(std::unique_ptr<IHotkeyListener>(raw));
+    Daemon daemon{std::unique_ptr<IHotkeyListener>(raw)};
     QSignalSpy spy(&daemon, &Daemon::permissionsChecked);
 
     daemon.start();

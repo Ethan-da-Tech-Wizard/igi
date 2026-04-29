@@ -9,7 +9,7 @@
 #include <leptonica/allheaders.h>
 
 #if defined(__APPLE__) || defined(__linux__)
-#  include <strings.h>  // explicit_bzero
+#  include <string.h>  // explicit_bzero
 #endif
 
 namespace igi::ocr {
@@ -20,7 +20,7 @@ namespace {
 // explicit_bzero; if a future host lacks it, fall back to a volatile
 // pointer overwrite.
 void secure_zero(void* p, std::size_t n) noexcept {
-#if defined(__APPLE__) || defined(__GLIBC__) || defined(__BIONIC__)
+#if defined(__GLIBC__) || defined(__BIONIC__)
     explicit_bzero(p, n);
 #else
     auto* v = static_cast<volatile unsigned char*>(p);
