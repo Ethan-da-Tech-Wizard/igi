@@ -5,6 +5,8 @@ add_executable(igi_smoke_test
     smoke_test.cpp
     daemon_test.cpp
     hotkey_listener_test.cpp
+    image_converter_test.cpp
+    screen_geometry_test.cpp
 )
 
 find_package(Qt6 REQUIRED COMPONENTS Test)

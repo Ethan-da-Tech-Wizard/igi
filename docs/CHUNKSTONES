@@ -1,0 +1,302 @@
+# Igi: Chunkstones
+
+A "chunkstone" is a milestone-sized chunk of work — small enough to land in a
+single PR, big enough to deliver a verifiable capability. This document
+defines all eight chunkstones for Igi, their scope, dependencies, and
+definition of done.
+
+> **Reading order:** Chunks are numbered along the critical path. Chunks 1+2
+> can run in parallel after Chunk 0; Chunks 4a/4b/6 can run in parallel after
+> their prerequisites land.
+
+---
+
+## Chunk 0 — Foundations
+
+**Goal:** Make the repository ready for parallel feature work. No
+user-visible features land here — this is purely scaffolding, decisions,
+and doc cleanup.
+
+### In scope
+- Build system: enable `CMAKE_AUTOMOC`, `CMAKE_AUTORCC`, `CMAKE_AUTOUIC`.
+  Add `tests/` and `assets/` directories referenced by
+  `REPOSITORY_STRUCTURE.md`.
+- Test framework: **GoogleTest** wired in.
+- CI: GitHub Actions workflow on `macos-14` (Apple Silicon) running
+  `cmake --build` + `ctest`.
+- Doc cleanup pass: replace "semantic" → "fuzzy"; "HIPAA-compliant" →
+  "HIPAA-aligned"; distinguish disk reads vs writes; switch
+  `memset(0)` → `explicit_bzero`; promote `NSEvent` over Carbon.
+- `docs/DECISIONS.md` capturing the binding technical decisions
+  (D-001 … D-007).
+- One no-op `Q_OBJECT` class to prove `AUTOMOC` works.
+
+### Definition of done
+- `cmake -B build && cmake --build build && ctest --test-dir build`
+  succeeds locally.
+- CI is green on `macos-14`.
+- All "semantic" / "HIPAA Compliant" / `memset(0)` strings are gone
+  from the repo.
+
+### Effort
+~1 dev-day.
+
+---
+
+## Chunk 1 — Core daemon + permissions
+
+**Goal:** A headless background process that registers a global hotkey
+and politely handles missing OS permissions.
+
+### In scope
+- `Info.plist` entries: `LSUIElement=1`,
+  `NSScreenCaptureDescription`, `NSAppleEventsUsageDescription`.
+- `IHotkeyListener` abstract interface (`src/core/HotkeyListener.h`).
+- Primary impl: `NSEventHotkeyListener` using
+  `+[NSEvent addGlobalMonitorForEventsMatchingMask:handler:]`.
+- Fallback impl: `CarbonHotkeyListener` using `RegisterEventHotKey`,
+  compiled but not selected by default.
+- Permission preflight at daemon startup:
+  - `CGPreflightScreenCaptureAccess()` for screen recording.
+  - `AXIsProcessTrustedWithOptions()` for accessibility.
+  - On denial, show a single Qt dialog with a button that opens
+    the relevant System Settings pane.
+- Daemon owns the Qt event loop. No windows shown at startup.
+
+### Definition of done
+- Launching the binary registers the hotkey; pressing `Cmd+Shift+F`
+  fires a `qDebug()` line.
+- Revoking screen recording → polite dialog, not a crash.
+- Unit tests: mocked `IHotkeyListener` proves callback wiring,
+  registration failure does not crash the daemon, and `permissionsChecked`
+  signal fires once per `start()`.
+
+### Effort
+~3 dev-days.
+
+---
+
+## Chunk 2 — Capture + image conversion
+
+**Goal:** Given a hotkey fire, produce a Leptonica `PIX*` containing the
+active window's pixels, with no disk writes.
+
+### In scope
+- `IScreenCapture` interface + factory (`src/core/ScreenCapture.h`).
+- macOS impl: lead with `CGWindowListCreateImage` (Qt's `QScreen::grabWindow`
+  cannot see other apps' windows). Handle multi-monitor via
+  `QGuiApplication::screens()` and per-screen `devicePixelRatio()`.
+- Active window resolution via the AX API
+  (`AXUIElementCopyAttributeValue` with `kAXFocusedWindowAttribute`).
+  AX message timeout via `AXUIElementSetMessagingTimeout` to bound
+  capture latency.
+- `ImageConverter::qImageToPix(const QImage&) -> PixPtr` with custom
+  deleter that calls `explicit_bzero` on the pixel buffer before
+  `pixDestroy`.
+- Multi-monitor coordinate utility (`ScreenGeometry`) — DPR-aware
+  point→pixel translation, used by Chunk 5's highlight overlay.
+- Use `QImage`, **not** `QPixmap`, end-to-end so we control the pixel
+  buffer and can wipe it (per D-006).
+
+### Out of scope
+- OCR processing (Chunk 3).
+- Highlight rendering (Chunk 5).
+- PDF direct ingest (Chunk 6).
+
+### Key files
+- `src/core/ScreenCapture.{h,mm}`
+- `src/core/ScreenGeometry.{h,cpp}`
+- `src/core/ActiveWindowInspector.{h,mm}`
+- `src/ocr/ImageConverter.{h,cpp}`
+- `tests/image_converter_test.cpp`
+- `tests/screen_geometry_test.cpp`
+
+### Definition of done
+- Fixture-image test feeds a known `QImage` through the converter and
+  recovers the pixel hash via `pixGetPixel` round-trip.
+- ScreenGeometry returns correct DPR-translated coordinates for a
+  multi-monitor virtual desktop fixture.
+- p95 capture+convert latency < 150 ms on M1 (deferred bench).
+- No `write()` syscall observed during a capture in CI sandbox
+  (deferred enforcement to Chunk 7).
+
+### Effort
+~3 dev-days.
+
+---
+
+## Chunk 3 — OCR pipeline
+
+**Goal:** Given a `PIX*`, produce a sorted list of
+`WordBox{text, x, y, w, h, confidence}` on a worker thread, without
+blocking the UI.
+
+### In scope
+- `OcrEngine` class owning a `tesseract::TessBaseAPI*` initialised
+  once at daemon startup with the `eng` model.
+- `OcrEngine::recognizeAsync(PixPtr) -> QFuture<std::vector<WordBox>>`,
+  running on a dedicated `QThreadPool`.
+- Word extraction via `ResultIterator` at `RIL_WORD` level, capturing
+  bounding box and confidence.
+- Secure wipe: `explicit_bzero(pixGetData(pix), size)` before
+  `pixDestroy`.
+- `WordBox` lives in `src/search/BoundingBox.h`.
+
+### Definition of done
+- Golden-image fixture finds ≥ 95% of expected words at confidence > 60.
+- Integration test asserts the main thread event loop runs while OCR
+  is in flight.
+- p50/p95 latency reported in CI output.
+
+### Effort
+~4 dev-days.
+
+---
+
+## Chunk 4a — Fuzzy search algorithm
+
+**Goal:** Pure-C++ ranking function over an in-memory
+`std::vector<WordBox>`. No Qt deps.
+
+### In scope
+- `FuzzySearch::topK(query, corpus, k)` returns ranked
+  `Match{WordBox, score}` per D-001 formula.
+- Wagner-Fischer with row-rolling and early-exit when running min cost
+  exceeds `(1 - threshold) * max(len)`.
+- Pre-normalisation: lowercase + punctuation strip on both sides
+  (cached on the corpus side at OCR completion time).
+
+### Definition of done
+- Table-driven tests: ("Igl", "Igi") → score ≥ 0.85; ("apple", "banana")
+  → below threshold.
+- Microbenchmark: top-10 over 5000 words < 16 ms on M1.
+
+### Effort
+~2 dev-days.
+
+---
+
+## Chunk 4b — Search bar UI
+
+**Goal:** Frameless, always-on-top, dark-mode `QWidget` that captures
+user input and emits a debounced `queryChanged(QString)` signal.
+
+### In scope
+- `SearchOverlay` extends `QWidget` with
+  `Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool`.
+- Single `QLineEdit` styled via QSS for dark mode.
+- 30 ms debounce timer on `textChanged`.
+- `Esc` triggers `closeRequested()` (handled in Chunk 5).
+- Position: centred horizontally on the active screen, 20% from top.
+
+### Definition of done
+- 5 keystrokes within 30 ms emit only one `queryChanged` signal.
+- Visual snapshot test of the bar across light/dark themes.
+
+### Effort
+~2 dev-days.
+
+---
+
+## Chunk 5 — Highlight overlay + teardown
+
+**Goal:** Draw a yellow polygon over the matched word's screen
+coordinates, integrate the full pipeline, and ensure clean memory
+destruction on close.
+
+### In scope
+- `HighlightOverlay` — frameless, click-through, full-screen
+  `QWidget` with `WA_TranslucentBackground`. Draws `QPolygonF` per
+  match with colour `rgba(255, 235, 59, 0.4)`.
+- Coordinate translation via Chunk 2's `ScreenGeometry`.
+- **Integration:** wire Daemon → ScreenCapture → ImageConverter →
+  OcrEngine → SearchOverlay → FuzzySearch → HighlightOverlay.
+- Teardown cascade on `Esc` / focus-lost / Daemon `closeSession()`:
+  hide overlays, free `PIX` and `QImage`, `explicit_bzero` the word
+  buffers, clear the corpus vector.
+
+### Definition of done
+- E2E demo: open a fixture window with the word "patient", hotkey,
+  type "patient", yellow polygon lands within 2 px of the word.
+- RSS test: post-session RSS ≤ pre-session RSS + 5 MB.
+- `Esc`, focus-loss, and window-close all trigger the same teardown
+  path.
+
+### Effort
+~5 dev-days.
+
+---
+
+## Chunk 6 — PDF direct-ingest path
+
+**Goal:** When the active window is a supported PDF viewer, render
+pages via MuPDF instead of screen capture, enabling multi-page search.
+
+### In scope
+- AX-based file path detection: `kAXDocumentAttribute` on the focused
+  window's AX element. Works for Preview; may work for Acrobat.
+- `PdfEngine` wrapping MuPDF: `fz_open_document`,
+  `fz_new_pixmap_from_page_number` at 150 DPI, `fz_pixmap` → `PIX`.
+- Bounded worker pool: render+OCR pages on demand, max N=4 in flight.
+- Fallback: AX detection failure → silently use Chunk 2's screen
+  capture path.
+- Multi-page result aggregation: `WordBox.pageIndex` field.
+
+### Definition of done
+- 50-page scanned PDF in Preview searches end-to-end.
+- Same PDF in Chrome falls back to screen capture without crash.
+- < 500 MB RSS regardless of PDF size (proven via 200-page fixture).
+
+### Effort
+~5 dev-days.
+
+---
+
+## Chunk 7 — Hardening + ship prep
+
+**Goal:** A notarized, distributable `.dmg` with verified zero-disk-write
+behaviour and clean memory hygiene.
+
+### In scope
+- Memory audit: every `PIX*`, `QImage`, `fz_pixmap*` confirmed
+  RAII-wrapped; `explicit_bzero` everywhere; `mlock()` on the active
+  session's pixel buffers with documented fallback when rlimit is
+  exceeded.
+- **Disk-write invariant test in CI:** binary runs under
+  `sandbox-exec` with a profile that denies all writes outside
+  `/dev/null` and an allowlisted test dir. Test fails if the binary
+  aborts.
+- Code signing & notarization: Apple Developer ID Application
+  certificate; `codesign --options=runtime --entitlements igi.entitlements`;
+  `xcrun notarytool submit` + staple.
+- `Info.plist` finalisation: `LSUIElement=1`, usage strings, bundle
+  ID `com.igi.ocr`.
+- Crash handler decision: don't ship one; rely on Apple's reporter
+  (which writes outside Igi's sphere — documented).
+- DMG packaging via `hdiutil`.
+
+### Definition of done
+- Notarized `.dmg` installs cleanly on a fresh macOS 14 VM.
+- Granted both TCC permissions, e2e demo works.
+- Sandbox test passes in CI.
+- `otool -L igi` shows no network frameworks linked.
+
+### Effort
+~5 dev-days.
+
+---
+
+## Schedule view
+
+| Week | Parallel tracks |
+|------|-----------------|
+| 1    | Chunk 0 |
+| 2    | Chunk 1 ‖ Chunk 2 |
+| 3    | Chunk 3 ‖ Chunk 6 (starts when Chunk 2 converter is stable) |
+| 4    | Chunk 4a ‖ Chunk 4b |
+| 5    | Chunk 5 (integration) |
+| 6    | Chunk 7 (hardening + ship) |
+
+Two engineers: ~6 calendar weeks. One engineer: ~10–12 weeks.
+
+**Critical path:** 0 → 2 → 3 → 5 → 7.

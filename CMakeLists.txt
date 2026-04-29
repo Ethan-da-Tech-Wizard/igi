@@ -1,12 +1,17 @@
 cmake_minimum_required(VERSION 3.16)
-project(IgiOCR VERSION 1.0 LANGUAGES CXX OBJCXX)
+project(IgiOCR VERSION 1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CMAKE_OBJCXX_STANDARD 17)
-set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
+# Objective-C++ is macOS-only; enabling it on Linux fails the
+# CMake compiler probe.
+if(APPLE)
+    enable_language(OBJCXX)
+    set(CMAKE_OBJCXX_STANDARD 17)
+    set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
+endif()
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -25,20 +30,25 @@ pkg_check_modules(LEPTONICA REQUIRED lept)
 # same translation units the binary ships with.
 add_library(igi_core STATIC
     src/core/Daemon.cpp
+    src/core/ScreenGeometry.cpp
+    src/ocr/ImageConverter.cpp
 )
 
 # macOS-only: Objective-C++ sources for system framework integrations.
 if(APPLE)
     target_sources(igi_core PRIVATE
         src/core/AppPolicy.mm
+        src/core/ActiveWindowInspector.mm
         src/core/HotkeyListener.mm
         src/core/Permissions.mm
+        src/core/ScreenCapture.mm
     )
 
     target_link_libraries(igi_core PUBLIC
         "-framework AppKit"
         "-framework Carbon"
         "-framework ApplicationServices"
+        "-framework CoreGraphics"
     )
 endif()
 
