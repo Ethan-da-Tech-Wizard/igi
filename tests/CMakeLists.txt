@@ -7,6 +7,7 @@ add_executable(igi_smoke_test
     hotkey_listener_test.cpp
     image_converter_test.cpp
     screen_geometry_test.cpp
+    ocr_engine_test.cpp
 )
 
 find_package(Qt6 REQUIRED COMPONENTS Test)
