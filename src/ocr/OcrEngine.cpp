@@ -2,6 +2,10 @@
 
 #include <QtConcurrent>
 
+#if defined(Q_OS_MACOS)
+#  include <CoreFoundation/CoreFoundation.h>
+#endif
+
 #include <tesseract/baseapi.h>
 #include <leptonica/allheaders.h>
 
@@ -24,7 +28,40 @@ OcrEngine::~OcrEngine() {
 
 bool OcrEngine::init(const char* dataPath, const char* language) {
     std::lock_guard<std::mutex> lock(tessMutex_);
-    if (tessApi_->Init(dataPath, language) != 0) {
+
+    // ── Resolve tessdata path ────────────────────────────────────────────────
+    // Priority:
+    //   1. Caller-supplied dataPath (testing / override)
+    //   2. App bundle Resources/tessdata (production)
+    //   3. TESSDATA_PREFIX environment variable
+    //   4. nullptr → Tesseract uses its compiled-in default
+    const char* resolvedPath = dataPath;
+    std::string bundlePath;
+
+#if defined(Q_OS_MACOS)
+    if (!resolvedPath) {
+        CFBundleRef bundle = CFBundleGetMainBundle();
+        if (bundle) {
+            CFURLRef resURL = CFBundleCopyResourcesDirectoryURL(bundle);
+            if (resURL) {
+                char pathBuf[PATH_MAX];
+                if (CFURLGetFileSystemRepresentation(resURL, true,
+                        reinterpret_cast<UInt8*>(pathBuf), sizeof(pathBuf))) {
+                    bundlePath = std::string(pathBuf) + "/tessdata";
+                    resolvedPath = bundlePath.c_str();
+                }
+                CFRelease(resURL);
+            }
+        }
+    }
+#endif
+
+    if (!resolvedPath) {
+        // Fallback: honour TESSDATA_PREFIX env var (set by Homebrew install)
+        resolvedPath = std::getenv("TESSDATA_PREFIX");
+    }
+
+    if (tessApi_->Init(resolvedPath, language) != 0) {
         return false;
     }
     // We only need bounding boxes and words, not the full layout analysis.

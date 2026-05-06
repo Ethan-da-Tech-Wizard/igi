@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- ── Identity ────────────────────────────────────────────── -->
+    <key>CFBundleIdentifier</key>
+    <string>com.igi.ocrsearch</string>
+
+    <key>CFBundleName</key>
+    <string>Igi</string>
+
+    <key>CFBundleDisplayName</key>
+    <string>Igi</string>
+
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+
+    <key>CFBundleExecutable</key>
+    <string>igi</string>
+
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <key>CFBundleSignature</key>
+    <string>????</string>
+
+    <!-- ── macOS minimum version ────────────────────────────────── -->
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+
+    <!-- ── Background-only utility: no Dock icon, no menu bar ──── -->
+    <!-- This is the definitive suppression of the Dock icon.       -->
+    <!-- The igi_set_activation_policy_accessory() call in main.cpp -->
+    <!-- handles the case where the binary is run outside a bundle. -->
+    <key>LSUIElement</key>
+    <true/>
+
+    <!-- ── Privacy usage descriptions (required by macOS 14+) ──── -->
+    <key>NSScreenCaptureDescription</key>
+    <string>Igi reads the pixels of the active window to perform on-device OCR search. No image data is stored or transmitted.</string>
+
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Igi requires Accessibility access to register the global Cmd+Shift+F hotkey.</string>
+
+    <!-- ── High-DPI support ──────────────────────────────────────── -->
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <!-- ── No document types / URL schemes ──────────────────────── -->
+    <!-- Igi is a pure background utility with no file associations. -->
+</dict>
+</plist>
