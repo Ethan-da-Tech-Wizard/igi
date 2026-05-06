@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Screen Recording: lets Igi call CGWindowListCreateImage -->
+    <key>com.apple.security.screen-capture</key>
+    <true/>
+
+    <!-- Accessibility: lets Igi register a global event monitor via NSEvent -->
+    <key>com.apple.security.accessibility</key>
+    <true/>
+
+    <!-- Igi makes no outbound network connections -->
+    <!-- com.apple.security.network.client is intentionally absent -->
+
+    <!-- Igi writes no files -->
+    <!-- com.apple.security.files.user-selected.read-write is intentionally absent -->
+    <!-- All D-007 zero-storage guarantees are enforced in code, not sandbox. -->
+</dict>
+</plist>
