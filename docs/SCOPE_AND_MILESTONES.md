@@ -31,31 +31,42 @@ To prevent scope creep and ensure adherence to the ultra-low latency, zero-stora
 * Install and link highly specific macOS dependencies (Qt, Tesseract, Leptonica, MuPDF) using Xcode 15.2 tools.
 * Scaffold initial `CMakeLists.txt` and verify C++ linkage with a successful `main.cpp` build.
 
-### 🚧 Milestone 2: The Core Engine (Daemon & Capture)
+### ✅ Milestone 2: The Core Engine (Daemon & Capture) (COMPLETED)
 * **Goal:** Establish the application as a background listener capable of grabbing pixels.
 * **Tasks:**
-  1. Configure the Qt application loop to run headlessly.
-  2. Register the `Cmd+Shift+F` global hotkey via `NSEvent.addGlobalMonitorForEventsMatchingMask` (primary). Carbon's `RegisterEventHotKey` is retained as a compiled fallback only (see `docs/DECISIONS.md` D-004).
-  3. Implement `QScreen::grabWindow` to capture the active window into a volatile `QPixmap` when the hotkey is fired.
+  1. Configure the Qt application loop to run headlessly. ✅
+  2. Register the `Cmd+Shift+F` global hotkey via `NSEvent.addGlobalMonitorForEventsMatchingMask` (primary). Carbon's `RegisterEventHotKey` is retained as a compiled fallback only (see `docs/DECISIONS.md` D-004). ✅
+  3. Implemented `CGWindowListCreateImage` to capture the active window into a volatile `QImage` when the hotkey is fired. ✅
 
-### ⏳ Milestone 3: The Data Pipeline (OCR & MuPDF Integration)
+### ✅ Milestone 3: The Data Pipeline (OCR Integration) (COMPLETED)
 * **Goal:** Pass the visual data to the OCR engine and extract coordinate arrays.
 * **Tasks:**
-  1. Write the memory-safe conversion function from Qt `QPixmap` to Leptonica `PIX` byte arrays.
-  2. Implement MuPDF memory streaming to ingest raw bytes from active PDF file paths directly into `PIX` byte arrays.
-  3. Feed the `PIX` array into the pre-loaded Tesseract engine.
-  4. Map the output to a volatile C++ array containing `[WordString, X_Coord, Y_Coord, Width, Height]`.
+  1. Wrote `ImageConverter::qImageToPix()` — memory-safe `QImage` → Leptonica `PIX` with `explicit_bzero` teardown (D-006). ✅
+  2. Fed `PIX` into pre-loaded Tesseract engine via `OcrEngine::recognizeAsync()` on a `QThreadPool`. ✅
+  3. Mapped output to a volatile `std::vector<WordBox>` containing `[text, x, y, w, h, confidence, pageIndex]`. ✅
 
-### ⏳ Milestone 4: Search UI & Algorithmic Matching
+### ✅ Milestone 4: Search UI & Algorithmic Matching (COMPLETED)
 * **Goal:** Create the user interface and connect it to the data array.
 * **Tasks:**
-  1. Build the frameless, always-on-top Qt search bar overlay.
-  2. Implement a high-performance Levenshtein/Fuzzy distance algorithm in C++ to run upon `textChanged` events in the search bar.
-  3. Return the coordinates of the highest-confidence match from the RAM array.
+  1. Built `SearchOverlay` — frameless, always-on-top dark glassmorphism Qt search pill. ✅
+  2. Implemented Wagner-Fischer fuzzy search (D-001) running on `textChanged` events, within 16 ms budget (D-002). ✅
+  3. `FuzzySearch::topK()` returns the top-K coordinate matches from the in-RAM corpus. ✅
 
-### ⏳ Milestone 5: Visual Highlight & Memory Teardown
+### ✅ Milestone 5: Visual Highlight & Memory Teardown (COMPLETED)
 * **Goal:** Physically draw the result on screen and ensure absolute data destruction.
 * **Tasks:**
-  1. Spawn a transparent Qt overlay over the active window.
-  2. Draw a semi-transparent yellow `QPolygonF` over the exact `(x, y, width, height)` coordinates of the matched word.
-  3. Implement the `Escape` key event to instantly trigger C++ destructors, destroying the UI widgets and freeing the Leptonica arrays and Qt Pixmaps from RAM.
+  1. Spawned `HighlightOverlay` — a transparent, click-through `QWidget` positioned over the captured window. ✅
+  2. Draws amber rounded rectangles over the exact `(x, y, w, h)` coordinates of each fuzzy match. ✅
+  3. `Escape` key triggers `corpus_.clear()` + `shrink_to_fit()`, destroying all OCR data from RAM (D-006, D-007). ✅
+
+### ✅ Milestone 6: Distribution & Security (COMPLETED)
+* **Goal:** Produce a Gatekeeper-clean, distributable macOS app with zero-write enforcement.
+* **Tasks:**
+  1. `Info.plist` with `LSUIElement=1`, privacy usage strings, min macOS 13. ✅
+  2. `Igi.entitlements` — screen-capture + accessibility only; no network or file-write entitlements. ✅
+  3. `eng.traineddata` bundled into `Resources/tessdata`; `OcrEngine` reads from bundle at runtime. ✅
+  4. `macdeployqt` run post-build to embed all Qt frameworks. ✅
+  5. `bundle.sh` — convenience build + DMG packaging script. ✅
+  6. `scripts/sign_and_notarize.sh` — ad-hoc (local) and Developer ID + notarization (CI) signing. ✅
+  7. `scripts/sandbox_test.sh` + `resources/igi.sb` — D-007 write-deny test under `sandbox-exec`. ✅
+  8. Two-job CI: `build-and-test` + `bundle-sign-sandbox` with conditional notarization on `main`. ✅

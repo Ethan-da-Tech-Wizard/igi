@@ -1,0 +1,38 @@
+;;; igi.sb — sandbox-exec profile for the D-007 write-deny CI test.
+;;;
+;;; Purpose: prove that the igi binary emits zero writes during a
+;;; full capture-less smoke run (daemon starts, tessdata loads, daemon
+;;; stops cleanly). Any write attempt outside the allowlist causes an
+;;; immediate sandbox violation, failing the test.
+;;;
+;;; References: DECISIONS.md D-007, SCOPE_AND_MILESTONES.md Milestone 5.
+
+(version 1)
+(deny default)
+
+;;; ── Reads: allow everywhere ──────────────────────────────────────────────
+(allow file-read*)
+
+;;; ── Process execution (dyld, Qt frameworks, etc.) ────────────────────────
+(allow process-exec)
+(allow process-fork)
+
+;;; ── Mach / IPC (Qt event loop, macOS system services) ────────────────────
+(allow mach-lookup)
+(allow ipc-posix-shm)
+
+;;; ── Signal delivery ──────────────────────────────────────────────────────
+(allow signal (target self))
+
+;;; ── Writes: ONLY to the explicitly allowlisted tmp scratch dir ───────────
+;;; This is the only directory our CI test script passes via $IGI_SCRATCH.
+(allow file-write*
+    (subpath (param "SCRATCH_DIR")))
+
+;;; ── macOS system write paths (dyld shared cache, etc.) ───────────────────
+;;; Without these the process cannot start at all on modern macOS.
+(allow file-write*
+    (subpath "/private/var/folders")          ; temp / per-user caches
+    (subpath "/private/tmp")                  ; POSIX tmp
+    (literal "/dev/null")
+    (literal "/dev/dtracehelper"))
