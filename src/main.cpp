@@ -3,11 +3,12 @@
 #include <QMessageBox>
 #include <QPushButton>
 
-#include <tesseract/baseapi.h>
-#include <leptonica/allheaders.h>
-
 #include "core/Daemon.h"
 #include "core/Permissions.h"
+#include "core/ScreenCapture.h"
+#include "ocr/OcrEngine.h"
+#include "SearchSession.h"
+#include "ui/SearchOverlay.h"
 
 #if defined(Q_OS_MACOS)
 extern "C" void igi_set_activation_policy_accessory();
@@ -18,36 +19,43 @@ int main(int argc, char* argv[]) {
 
     // Suppress Dock icon — Igi runs as a background utility.
     // The definitive suppression is LSUIElement=1 in Info.plist (Chunk 7).
-    // This call handles the case where the binary is run directly without
-    // an app bundle.
 #if defined(Q_OS_MACOS)
     igi_set_activation_policy_accessory();
 #endif
 
-    qDebug() << "[igi] Daemon engine starting...";
+    qDebug() << "[igi] Starting…";
 
-    // Pre-load Tesseract. TESSDATA_PREFIX must point to the tessdata directory
-    // (set automatically when installed via Homebrew; bundled in the app for
-    // distribution — Chunk 7).
-    tesseract::TessBaseAPI ocr;
-    if (ocr.Init(nullptr, "eng") != 0) {
+    // ── OCR engine ──
+    // Initialised once at startup and reused across all sessions.
+    auto ocrEngine = std::make_unique<igi::ocr::OcrEngine>();
+    if (!ocrEngine->init(nullptr, "eng")) {
         qWarning() << "[igi] Tesseract initialisation failed. "
                       "Ensure tessdata is installed (TESSDATA_PREFIX).";
         return 1;
     }
-    qDebug() << "[igi] Tesseract OCR engine pre-loaded.";
+    qDebug() << "[igi] Tesseract pre-loaded.";
 
+    // ── Screen capture ──
+    auto capture = igi::core::IScreenCapture::create();
+
+    // ── Search overlay ──
+    auto* overlay = new igi::ui::SearchOverlay;
+
+    // ── Pipeline controller ──
+    auto* session = new igi::SearchSession(
+        capture.get(), ocrEngine.get(), overlay);
+
+    // ── Daemon (hotkey + permissions) ──
     igi::core::Daemon daemon;
 
-    // Surface permission state to the user with a non-blocking dialog
-    // when something is missing. The signal fires on every preflight,
-    // so we filter here.
+    // Surface missing permissions to the user.
     QObject::connect(&daemon, &igi::core::Daemon::permissionsChecked,
         [](bool screenGranted, bool axGranted) {
             if (screenGranted && axGranted) {
                 return;
             }
-            QMessageBox* box = new QMessageBox(QMessageBox::Warning,
+            auto* box = new QMessageBox(
+                QMessageBox::Warning,
                 QStringLiteral("Igi — Permissions Required"),
                 QStringLiteral(
                     "Igi needs two macOS permissions to work:\n\n"
@@ -77,16 +85,16 @@ int main(int argc, char* argv[]) {
             box->show();
         });
 
-    // Log each hotkey trigger (later chunks attach the capture pipeline here).
+    // ── THE PIPELINE WIRE ──
+    // Cmd+Shift+F → capture → OCR → search ready.
     QObject::connect(&daemon, &igi::core::Daemon::hotkeyTriggered,
-        [] { qDebug() << "[igi] Cmd+Shift+F triggered — capture pipeline TBD."; });
+        session, &igi::SearchSession::activate);
 
     daemon.start();
-    qDebug() << "[igi] Daemon started. Listening for Cmd+Shift+F...";
+    qDebug() << "[igi] Daemon started. Listening for Cmd+Shift+F…";
 
     int ret = app.exec();
 
     daemon.stop();
-    ocr.End();
     return ret;
 }
