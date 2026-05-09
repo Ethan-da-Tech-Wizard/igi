@@ -71,16 +71,39 @@ void SearchSession::activate() {
 }
 
 void SearchSession::dismiss() {
-    // Immediately wipe the corpus from RAM (D-006, D-007).
+    // ── Secure corpus wipe (D-006 / SEC-02) ─────────────────────────────────
+    //
+    // PROBLEM: corpus_.clear() releases the WordBox objects, but the QString
+    // heap buffers holding OCR-extracted text (potential PHI) are merely
+    // returned to the allocator — the bytes remain readable in freed memory
+    // until they happen to be overwritten by a future allocation.  A memory
+    // forensics tool (or a process-injection attacker) running between clear()
+    // and the next allocation can recover those strings verbatim.
+    //
+    // FIX: for every WordBox, we force QString to detach its copy-on-write
+    // buffer (data() call), then run explicit_bzero() over the raw UTF-16
+    // payload.  explicit_bzero is guaranteed NOT to be elided by the compiler
+    // (unlike memset on a dead variable), per the POSIX rationale and Apple's
+    // <string.h> documentation.  Only AFTER zeroing do we clear the vector.
+    for (auto& wb : corpus_) {
+        if (!wb.text.isEmpty()) {
+            // data() forces detach: we now own this buffer exclusively.
+            QChar* buf = wb.text.data();
+            explicit_bzero(buf, static_cast<size_t>(wb.text.size()) * sizeof(QChar));
+        }
+        if (!wb.normalizedText.isEmpty()) {
+            QChar* buf = wb.normalizedText.data();
+            explicit_bzero(buf, static_cast<size_t>(wb.normalizedText.size()) * sizeof(QChar));
+        }
+    }
+
     corpus_.clear();
-    corpus_.shrink_to_fit();
+    corpus_.shrink_to_fit();  // Release the vector's heap allocation entirely.
     capturedScreenRect_ = {};
 
-    // The overlay hides itself (Escape keyPress → dismissed signal → here).
-    // Nothing else to do — the overlay's HighlightOverlay is hidden by the
-    // overlay itself on dismiss.
-    qDebug() << "[igi] SearchSession: dismissed, corpus cleared.";
+    qDebug() << "[igi] SearchSession: dismissed — corpus securely wiped.";
 }
+
 
 void SearchSession::onOcrFinished() {
     corpus_ = ocrWatcher_.result();
