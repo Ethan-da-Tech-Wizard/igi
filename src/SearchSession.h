@@ -3,6 +3,8 @@
 #include <memory>
 #include <vector>
 
+#include <sys/mman.h>   // mlock / munlock
+
 #include <QFutureWatcher>
 #include <QObject>
 #include <QRect>
@@ -59,6 +61,16 @@ private:
 
     // Watcher for the async OCR QFuture.
     QFutureWatcher<std::vector<search::WordBox>> ocrWatcher_;
+
+    // Tracks whether the corpus pages are currently mlock()-ed.
+    bool corpusLocked_ = false;
+
+    // Lock all QString heap buffers in the corpus against OS swap (D-002/SEC-01).
+    // Called immediately after OCR results arrive.
+    void mlockCorpus();
+
+    // Unlock and zero the corpus pages before releasing them (dismiss).
+    void munlockAndWipeCorpus();
 };
 
 }  // namespace igi

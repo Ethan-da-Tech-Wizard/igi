@@ -46,6 +46,7 @@ if(APPLE)
         src/core/HotkeyListener.mm
         src/core/Permissions.mm
         src/core/ScreenCapture.mm
+        src/core/SecurityGuard.mm
     )
 
     target_link_libraries(igi_core PUBLIC
@@ -54,6 +55,8 @@ if(APPLE)
         "-framework ApplicationServices"
         "-framework CoreGraphics"
         "-framework CoreFoundation"
+        "-framework Security"
+        "-framework IOKit"
     )
 endif()
 
@@ -135,18 +138,19 @@ if(APPLE)
     endforeach()
 
     # ── macdeployqt: bundle Qt dylibs + frameworks ──────────────────────────
-    # Only run when building Release (skip in Debug to keep iteration fast).
-    # macdeployqt is found next to qmake in the Qt installation.
+    # SKIPPED in Debug builds — macdeployqt copies ~150 MB of Qt frameworks
+    # and takes 2+ minutes, killing incremental rebuild speed.
+    # Run `./bundle.sh --release` to get a fully deployable bundle.
     find_program(MACDEPLOYQT_EXECUTABLE macdeployqt
         HINTS "${Qt6_DIR}/../../../bin"
         NO_DEFAULT_PATH)
 
     if(MACDEPLOYQT_EXECUTABLE)
         add_custom_command(TARGET igi POST_BUILD
-            COMMAND "${MACDEPLOYQT_EXECUTABLE}"
-                    "$<TARGET_BUNDLE_DIR:igi>"
-                    -always-overwrite
-            COMMENT "[igi] Running macdeployqt…"
+            COMMAND "$<IF:$<CONFIG:Release>,${MACDEPLOYQT_EXECUTABLE},true>"
+                    "$<IF:$<CONFIG:Release>,$<TARGET_BUNDLE_DIR:igi>,dummy>"
+                    "$<IF:$<CONFIG:Release>,-always-overwrite,>"
+            COMMENT "[igi] macdeployqt (Release only — skipped in Debug)…"
             VERBATIM
         )
     else()
