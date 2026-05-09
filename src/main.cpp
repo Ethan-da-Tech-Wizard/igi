@@ -1,11 +1,16 @@
+#include <csignal>
+#include <unistd.h>   // pipe(), write(), read()
+
 #include <QApplication>
 #include <QDebug>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSocketNotifier>
 
 #include "core/Daemon.h"
 #include "core/Permissions.h"
 #include "core/ScreenCapture.h"
+#include "core/SecurityGuard.h"
 #include "ocr/OcrEngine.h"
 #include "SearchSession.h"
 #include "ui/SearchOverlay.h"
@@ -14,7 +19,55 @@
 extern "C" void igi_set_activation_policy_accessory();
 #endif
 
+// ── POSIX signal → Qt event bridge (self-pipe trick) ─────────────────────────
+//
+// THREAT (T-2): If Igi is killed (SIGTERM from the OS, SIGINT from Ctrl+C, or
+// SIGQUIT from a force-quit script) while an active session holds mlock()'d
+// PHI in corpus_, the default signal handler terminates the process immediately
+// — bypassing dismiss(), skipping explicit_bzero(), and leaving zeroed-but-not-
+// yet-munlock()'d pages in RAM.
+//
+// FIX: The self-pipe trick bridges POSIX signals (which are async-signal-unsafe
+// for Qt) into Qt's event loop safely:
+//   1. A raw POSIX signal handler writes one byte to a pipe fd.
+//   2. A QSocketNotifier watches the read end of that pipe.
+//   3. When the notifier fires (on the main thread, inside the Qt event loop),
+//      it calls session->dismiss() then app.quit() — guaranteeing the corpus
+//      is zeroed and munlock()'d before the process exits.
+//
+// This pattern is recommended by the Qt documentation for POSIX signal handling.
+static int g_sigPipe[2] = {-1, -1};
+
+static void posixSignalHandler(int /*sig*/) {
+    // async-signal-safe: write() is on the POSIX safe list.
+    char byte = 1;
+    (void)::write(g_sigPipe[1], &byte, sizeof(byte));
+}
+
+static bool setupSignalHandler() {
+    if (::pipe(g_sigPipe) != 0) {
+        qWarning() << "[igi] Failed to create signal pipe. "
+                      "SIGTERM/SIGINT will not trigger secure corpus wipe.";
+        return false;
+    }
+    struct sigaction sa;
+    sa.sa_handler = posixSignalHandler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    sigaction(SIGTERM, &sa, nullptr);
+    sigaction(SIGINT,  &sa, nullptr);
+    sigaction(SIGQUIT, &sa, nullptr);
+    return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 int main(int argc, char* argv[]) {
+    // ── SEC-GUARD: run all security checks before any PHI can enter scope ──
+    // This runs before QApplication so that NSLog output goes to Unified Log
+    // unfiltered. Hard failures abort(). Soft warnings log to MDM syslog.
+    igi::core::SecurityGuard::runStartupChecks();
+
     QApplication app(argc, argv);
 
     // Suppress Dock icon — Igi runs as a background utility.
@@ -24,6 +77,10 @@ int main(int argc, char* argv[]) {
 #endif
 
     qDebug() << "[igi] Starting…";
+
+    // ── Signal handling: wire SIGTERM/SIGINT/SIGQUIT → dismiss() ──────────────
+    // Must be set up before any session is created so the pipe is ready.
+    const bool sigOk = setupSignalHandler();
 
     // ── OCR engine ──
     // Initialised once at startup and reused across all sessions.
@@ -44,6 +101,28 @@ int main(int argc, char* argv[]) {
     // ── Pipeline controller ──
     auto* session = new igi::SearchSession(
         capture.get(), ocrEngine.get(), overlay);
+
+    // ── Connect signal pipe to secure dismiss ──────────────────────────────
+    // QSocketNotifier fires on the main thread (Qt event loop) when a byte
+    // arrives in the pipe — this is where we can safely call Qt and C++ code.
+    if (sigOk) {
+        auto* sigNotifier = new QSocketNotifier(g_sigPipe[0],
+                                                 QSocketNotifier::Read, &app);
+        QObject::connect(sigNotifier, &QSocketNotifier::activated,
+            [&app, session](QSocketDescriptor, QSocketNotifier::Type) {
+                qDebug() << "[igi] Signal received — running secure dismiss "
+                            "before exit.";
+                // Drain the pipe byte.
+                char byte = 0;
+                (void)::read(g_sigPipe[0], &byte, sizeof(byte));
+                // Securely wipe corpus (explicit_bzero + munlock).
+                session->dismiss();
+                // Cleanly exit the Qt event loop.
+                app.quit();
+            });
+        qDebug() << "[igi] Signal handler installed "
+                    "(SIGTERM/SIGINT/SIGQUIT → secure dismiss).";
+    }
 
     // ── Daemon (hotkey + permissions) ──
     igi::core::Daemon daemon;
@@ -86,7 +165,6 @@ int main(int argc, char* argv[]) {
         });
 
     // ── THE PIPELINE WIRE ──
-    // Cmd+Shift+F → capture → OCR → search ready.
     QObject::connect(&daemon, &igi::core::Daemon::hotkeyTriggered,
         session, &igi::SearchSession::activate);
 
@@ -95,6 +173,12 @@ int main(int argc, char* argv[]) {
 
     int ret = app.exec();
 
+    // Ensure a final secure dismiss on clean exit (user closed the app normally).
+    session->dismiss();
     daemon.stop();
+
+    if (g_sigPipe[0] != -1) ::close(g_sigPipe[0]);
+    if (g_sigPipe[1] != -1) ::close(g_sigPipe[1]);
+
     return ret;
 }

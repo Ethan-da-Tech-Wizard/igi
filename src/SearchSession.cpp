@@ -1,5 +1,6 @@
 #include "SearchSession.h"
 
+#include "core/SecureWipe.h"   // igi_bzero (compiler-elision-proof wipe)
 #include <QDebug>
 
 #include "core/ScreenCapture.h"
@@ -89,29 +90,115 @@ void SearchSession::dismiss() {
         if (!wb.text.isEmpty()) {
             // data() forces detach: we now own this buffer exclusively.
             QChar* buf = wb.text.data();
-            explicit_bzero(buf, static_cast<size_t>(wb.text.size()) * sizeof(QChar));
+            igi_bzero(buf, static_cast<size_t>(wb.text.size()) * sizeof(QChar));
         }
         if (!wb.normalizedText.isEmpty()) {
             QChar* buf = wb.normalizedText.data();
-            explicit_bzero(buf, static_cast<size_t>(wb.normalizedText.size()) * sizeof(QChar));
+            igi_bzero(buf, static_cast<size_t>(wb.normalizedText.size()) * sizeof(QChar));
         }
     }
 
-    corpus_.clear();
-    corpus_.shrink_to_fit();  // Release the vector's heap allocation entirely.
+    munlockAndWipeCorpus();
     capturedScreenRect_ = {};
 
     qDebug() << "[igi] SearchSession: dismissed — corpus securely wiped.";
 }
+
+// ── mlock / munlock helpers ───────────────────────────────────────────────────
+//
+// SEC-01 (RISK_REGISTER.md): mlock() pins pages in physical RAM so the OS
+// cannot write them to the swap file under memory pressure.  Without this,
+// even explicit_bzero() cannot guarantee the data wasn't already written to
+// the SSD in a previous page-out cycle.
+//
+// We mlock each QString's individual heap buffer because std::vector<WordBox>
+// stores WordBox objects contiguously, but each WordBox contains two QStrings
+// whose UTF-16 data lives in separate heap allocations — not in the vector's
+// own buffer. We must lock each one individually.
+//
+// mlock() is limited by the process's RLIMIT_MEMLOCK ulimit. On macOS the
+// default is ~8 MB per process, which is well above any OCR corpus for a
+// single screen. If mlock() fails we log a warning and continue — the
+// explicit_bzero wipe on dismiss() still runs as the secondary control.
+void SearchSession::mlockCorpus() {
+    int failCount = 0;
+    for (const auto& wb : corpus_) {
+        if (!wb.text.isEmpty()) {
+            const void* p = wb.text.constData();
+            if (::mlock(p, static_cast<size_t>(wb.text.size()) * sizeof(QChar)) != 0) {
+                ++failCount;
+            }
+        }
+        if (!wb.normalizedText.isEmpty()) {
+            const void* p = wb.normalizedText.constData();
+            if (::mlock(p, static_cast<size_t>(wb.normalizedText.size()) * sizeof(QChar)) != 0) {
+                ++failCount;
+            }
+        }
+    }
+    corpusLocked_ = true;
+    if (failCount > 0) {
+        qWarning() << "[igi] mlock() failed for" << failCount
+                   << "buffers. Corpus may be swappable. "
+                      "Check RLIMIT_MEMLOCK (ulimit -l).";
+    } else {
+        qDebug() << "[igi] Corpus mlock()'d —" << corpus_.size()
+                 << "WordBoxes pinned in RAM.";
+    }
+}
+
+void SearchSession::munlockAndWipeCorpus() {
+    // ── Step 1: explicit_bzero every QString buffer ──
+    // data() forces QString copy-on-write detach so we own the buffer.
+    // explicit_bzero cannot be compiler-elided (unlike memset on dead stores).
+    for (auto& wb : corpus_) {
+        if (!wb.text.isEmpty()) {
+            QChar* buf = wb.text.data();
+            igi_bzero(buf, static_cast<size_t>(wb.text.size()) * sizeof(QChar));
+        }
+        if (!wb.normalizedText.isEmpty()) {
+            QChar* buf = wb.normalizedText.data();
+            igi_bzero(buf, static_cast<size_t>(wb.normalizedText.size()) * sizeof(QChar));
+        }
+    }
+
+    // ── Step 2: munlock so the OS can reclaim the pages ──
+    // We munlock AFTER zeroing, not before — if we unlocked first, the OS
+    // could theoretically page-out the zeroed page before we zero it
+    // (extremely unlikely but architecturally possible under heavy pressure).
+    if (corpusLocked_) {
+        for (const auto& wb : corpus_) {
+            if (!wb.text.isEmpty()) {
+                ::munlock(wb.text.constData(),
+                          static_cast<size_t>(wb.text.size()) * sizeof(QChar));
+            }
+            if (!wb.normalizedText.isEmpty()) {
+                ::munlock(wb.normalizedText.constData(),
+                          static_cast<size_t>(wb.normalizedText.size()) * sizeof(QChar));
+            }
+        }
+        corpusLocked_ = false;
+    }
+
+    // ── Step 3: release the vector ──
+    corpus_.clear();
+    corpus_.shrink_to_fit();
+}
+
 
 
 void SearchSession::onOcrFinished() {
     corpus_ = ocrWatcher_.result();
     qDebug() << "[igi] SearchSession: OCR complete," << corpus_.size() << "words extracted.";
 
+    // Pin corpus pages in RAM immediately — before any search occurs.
+    // Prevents the OS from writing PHI to the swap file (SEC-01).
+    mlockCorpus();
+
     // Re-run search with whatever the user has typed while OCR was running.
     onQueryChanged(overlay_->query());
 }
+
 
 void SearchSession::onQueryChanged(const QString& query) {
     if (corpus_.empty() || query.trimmed().isEmpty()) {
