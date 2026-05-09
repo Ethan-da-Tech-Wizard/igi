@@ -118,11 +118,10 @@ SearchOverlay::SearchOverlay(QWidget* parent)
             this, &SearchOverlay::queryChanged);
 }
 
-void SearchOverlay::activate() {
-    // Centre horizontally near the top of the primary screen.
-    const QRect screenGeo = QApplication::primaryScreen()->availableGeometry();
-    const int x = screenGeo.center().x() - width() / 2;
-    const int y = screenGeo.top() + 80;
+void SearchOverlay::activate(const QRect& targetScreen) {
+    // Centre horizontally near the top of the captured screen.
+    const int x = targetScreen.center().x() - width() / 2;
+    const int y = targetScreen.top() + 80;
     move(x, y);
 
     show();

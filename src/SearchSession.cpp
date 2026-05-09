@@ -80,7 +80,7 @@ void SearchSession::activate() {
     ocrWatcher_.setFuture(future);
 
     // ── 4. Show the search bar immediately so the user can start typing ──
-    overlay_->activate();
+    overlay_->activate(logicalScreenRect_);
 
     qDebug() << "[igi] SearchSession: OCR running in background…";
 }
