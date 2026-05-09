@@ -6,6 +6,10 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSocketNotifier>
+#include <QSystemTrayIcon>
+#include <QMenu>
+#include <QAction>
+#include <QIcon>
 
 #include "core/Daemon.h"
 #include "core/Permissions.h"
@@ -125,6 +129,30 @@ int main(int argc, char* argv[]) {
         qDebug() << "[igi] Signal handler installed "
                     "(SIGTERM/SIGINT/SIGQUIT → secure dismiss).";
     }
+
+    // ── System Tray Icon (Menu Bar) ──
+    QSystemTrayIcon trayIcon;
+    // Load the .icns file from the macOS app bundle structure.
+    QIcon icon(QCoreApplication::applicationDirPath() + "/../Resources/AppIcon.icns");
+    trayIcon.setIcon(icon);
+    
+    QMenu trayMenu;
+    QAction* titleAction = trayMenu.addAction("Igi OCR Search");
+    titleAction->setEnabled(false);
+    
+    QAction* hotkeyAction = trayMenu.addAction("Hotkey: Cmd+Shift+9");
+    hotkeyAction->setEnabled(false);
+    
+    trayMenu.addSeparator();
+    
+    QAction* quitAction = trayMenu.addAction("Quit Igi");
+    QObject::connect(quitAction, &QAction::triggered, &app, [session, &app]() {
+        session->dismiss();
+        app.quit();
+    });
+    
+    trayIcon.setContextMenu(&trayMenu);
+    trayIcon.show();
 
     // ── Daemon (hotkey + permissions) ──
     igi::core::Daemon daemon;
