@@ -92,14 +92,19 @@ target_link_libraries(igi PRIVATE igi_core)
 
 # ── macOS app bundle packaging (Chunk 7) ────────────────────────────────────
 if(APPLE)
-    # Embed Info.plist (sets LSUIElement=1, privacy strings, etc.)
+    # Embed Info.plist and Icon.
     set_target_properties(igi PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist"
+        MACOSX_BUNDLE_ICON_FILE  "AppIcon.icns"
         MACOSX_BUNDLE_BUNDLE_NAME          "Igi"
         MACOSX_BUNDLE_BUNDLE_VERSION       "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         MACOSX_BUNDLE_GUI_IDENTIFIER       "com.igi.ocrsearch"
     )
+
+    # Copy the app icon into the bundle's Resources directory.
+    set_source_files_properties("resources/AppIcon.icns" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+    target_sources(igi PRIVATE "resources/AppIcon.icns")
 
     # ── Locate tessdata ──────────────────────────────────────────────────────
     # Prefer an explicit override (useful in CI with a custom TESSDATA_PREFIX),
