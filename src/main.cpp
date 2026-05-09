@@ -160,10 +160,14 @@ int main(int argc, char* argv[]) {
                 QObject::connect(btn, &QPushButton::clicked,
                     [] { igi::core::openAccessibilitySettings(); });
             }
-            box->addButton(QMessageBox::Ignore);
+            QPushButton* quitBtn = box->addButton(QMessageBox::Close);
             box->setAttribute(Qt::WA_DeleteOnClose);
             box->setWindowFlags(box->windowFlags() | Qt::WindowStaysOnTopHint);
+            
+            // Re-check permissions periodically if the dialog is open? No, if they click quit, exit.
             box->show();
+            
+            QObject::connect(quitBtn, &QPushButton::clicked, qApp, &QCoreApplication::quit);
         });
 
     // ── THE PIPELINE WIRE ──
@@ -171,7 +175,7 @@ int main(int argc, char* argv[]) {
         session, &igi::SearchSession::activate);
 
     daemon.start();
-    qDebug() << "[igi] Daemon started. Listening for Cmd+Shift+F…";
+    qDebug() << "[igi] Daemon started. Listening for Cmd+Shift+9…";
 
     int ret = app.exec();
 
