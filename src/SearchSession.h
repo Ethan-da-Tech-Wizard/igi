@@ -60,6 +60,12 @@ private:
 
     // Physical-pixel rect of the most-recently captured window.
     QRect capturedScreenRect_;
+    
+    // Logical-pixel rect of the window, used for Qt rendering.
+    QRect logicalScreenRect_;
+    
+    // The device pixel ratio of the screen the window was captured on.
+    double devicePixelRatio_ = 1.0;
 
     // The OCR corpus for the current session. Cleared on dismiss().
     std::vector<search::WordBox> corpus_;
