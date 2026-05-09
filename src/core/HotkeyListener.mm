@@ -28,7 +28,7 @@ public:
             addGlobalMonitorForEventsMatchingMask:NSEventMaskKeyDown
             handler:^(NSEvent* event) {
                 if ((event.modifierFlags & requiredMods) == requiredMods &&
-                    event.keyCode == kVK_ANSI_F) {
+                    event.keyCode == kVK_ANSI_9) {
                     if (callback_) callback_();
                 }
             }];
@@ -38,7 +38,7 @@ public:
             addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown
             handler:^NSEvent*(NSEvent* event) {
                 if ((event.modifierFlags & requiredMods) == requiredMods &&
-                    event.keyCode == kVK_ANSI_F) {
+                    event.keyCode == kVK_ANSI_9) {
                     if (callback_) callback_();
                     return nil;  // consume the event
                 }
@@ -86,7 +86,7 @@ public:
 
         EventHotKeyID keyID{.signature = 'IGI1', .id = 1};
         OSStatus status = RegisterEventHotKey(
-            kVK_ANSI_F,
+            kVK_ANSI_9,
             cmdKey | shiftKey,
             keyID,
             GetApplicationEventTarget(),

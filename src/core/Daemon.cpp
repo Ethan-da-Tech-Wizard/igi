@@ -67,7 +67,7 @@ void Daemon::checkAndWirePermissions() {
         qWarning() << "[igi] Global hotkey registration failed "
                       "(check Accessibility permission).";
     } else {
-        qDebug() << "[igi] Global hotkey Cmd+Shift+F registered.";
+        qDebug() << "[igi] Global hotkey Cmd+Shift+9 registered.";
     }
 }
 

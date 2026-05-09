@@ -8,15 +8,23 @@ namespace igi::core {
 PermissionStatus preflightPermissions() {
     PermissionStatus status;
 
-    // Screen recording: CGPreflightScreenCaptureAccess() checks without
-    // triggering a TCC prompt. On macOS 10.15+ only.
+    // Screen recording: CGPreflightScreenCaptureAccess() checks without prompting.
+    // If it fails, we MUST call CGRequestScreenCaptureAccess() to force macOS
+    // to add the app to the list in System Settings.
     status.screenRecording = CGPreflightScreenCaptureAccess();
+    if (!status.screenRecording) {
+        CGRequestScreenCaptureAccess();
+    }
 
-    // Accessibility: pass kAXTrustedCheckOptionPrompt = false to avoid
-    // auto-prompting — we manage that ourselves with a friendlier dialog.
-    NSDictionary* opts = @{(__bridge id)kAXTrustedCheckOptionPrompt: @NO};
-    status.accessibility = AXIsProcessTrustedWithOptions(
-        (__bridge CFDictionaryRef)opts);
+    // Accessibility: check without prompting first.
+    NSDictionary* noPromptOpts = @{(__bridge id)kAXTrustedCheckOptionPrompt: @NO};
+    status.accessibility = AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)noPromptOpts);
+    
+    // If not granted, check again WITH prompting so it populates the Accessibility list.
+    if (!status.accessibility) {
+        NSDictionary* promptOpts = @{(__bridge id)kAXTrustedCheckOptionPrompt: @YES};
+        AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)promptOpts);
+    }
 
     return status;
 }
