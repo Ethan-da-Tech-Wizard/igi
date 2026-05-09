@@ -80,11 +80,14 @@ jobs:
       # for local installs on the same machine; full Developer ID + notarization
       # is triggered only on pushes to main when the secrets are set.
       - name: Import Developer ID certificate (if secret is set)
-        if: ${{ secrets.APPLE_CERT_P12 != '' }}
         env:
           APPLE_CERT_P12:       ${{ secrets.APPLE_CERT_P12 }}
           APPLE_CERT_PASSWORD:  ${{ secrets.APPLE_CERT_PASSWORD }}
         run: |
+          if [ -z "${APPLE_CERT_P12}" ]; then
+            echo "No Developer ID certificate provided. Skipping import."
+            exit 0
+          fi
           KEYCHAIN="igi-ci.keychain"
           security create-keychain -p "" "${KEYCHAIN}"
           security default-keychain -s "${KEYCHAIN}"
@@ -103,7 +106,7 @@ jobs:
 
       - name: Sign bundle
         env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '-' }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           IGI_BUILD_DIR: ${{ github.workspace }}/build
         run: ./scripts/sign_and_notarize.sh
 
@@ -115,8 +118,7 @@ jobs:
       - name: Notarize and staple
         if: >
           github.event_name == 'push' &&
-          github.ref == 'refs/heads/main' &&
-          secrets.APPLE_ID != ''
+          github.ref == 'refs/heads/main'
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID:               ${{ secrets.APPLE_ID }}
