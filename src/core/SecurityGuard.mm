@@ -337,7 +337,70 @@ void SecurityGuard::auditAccessibilityGrants() {
     }
 }
 
-// ── Public entry point ────────────────────────────────────────────────────────
+// ── SEC-GUARD-06: FileVault enforcement check ────────────────────────────────
+//
+// THREAT (T-2): Without FileVault, physical disk extraction takes < 60 seconds.
+// Attacker removes the SSD, mounts it on any other Mac, and reads every file
+// including any swap pages written during a PHI session. Even with mlock() and
+// explicit_bzero active during runtime, data written to swap BEFORE those
+// controls ran (OS boot, pre-session page-outs) is permanently readable.
+//
+// ADDITIONALLY: Cold-boot attacks against DRAM are far more valuable when the
+// attacker can also read disk — they can cross-reference RAM dumps against swap.
+//
+// DEFENCE: Run `fdesetup status` via NSTask and parse stdout. If FileVault is
+// not On, log a strong warning to the Unified Log (MDM syslog). We do NOT
+// abort the process — FileVault is an administrative control that may be managed
+// separately by IT — but the warning must be impossible to miss.
+void SecurityGuard::checkFileVault() {
+    NSTask* task = [[NSTask alloc] init];
+    task.launchPath = @"/usr/bin/fdesetup";
+    task.arguments  = @[@"status"];
+
+    NSPipe* pipe = [NSPipe pipe];
+    task.standardOutput = pipe;
+    task.standardError  = [NSPipe pipe];  // suppress stderr noise
+
+    NSError* launchError = nil;
+    [task launchAndReturnError:&launchError];
+    if (launchError) {
+        IGI_SEC_WARN("SEC-GUARD-06: Could not launch fdesetup (%@). "
+                     "FileVault status unknown — verify manually.",
+                     launchError.localizedDescription);
+        return;
+    }
+
+    NSData* outputData = [[pipe fileHandleForReading] readDataToEndOfFile];
+    [task waitUntilExit];
+
+    NSString* output = [[NSString alloc] initWithData:outputData
+                                             encoding:NSUTF8StringEncoding];
+    output = [output stringByTrimmingCharactersInSet:
+                  [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+
+    // fdesetup outputs either:
+    //   "FileVault is On."   → encrypted
+    //   "FileVault is Off."  → unencrypted
+    if ([output containsString:@"FileVault is On"]) {
+        IGI_SEC_INFO("SEC-GUARD-06 PASS: FileVault is ON. "
+                     "Disk is encrypted. Cold-boot disk extraction attacks mitigated.");
+    } else if ([output containsString:@"FileVault is Off"]) {
+        // This is a serious finding — log it loudly so MDM syslog catches it.
+        IGI_SEC_WARN("SEC-GUARD-06 FAIL: FileVault is OFF on this machine!\n"
+                     "\n"
+                     "RISK: Any attacker with 60 seconds of physical access can\n"
+                     "remove the SSD and read all data including OS swap pages\n"
+                     "that may contain PHI written during Igi sessions. mlock()\n"
+                     "prevents swap during active sessions but NOT before/after.\n"
+                     "\n"
+                     "ACTION REQUIRED: Enable FileVault immediately:\n"
+                     "  System Settings → Privacy & Security → FileVault → Turn On");
+    } else {
+        IGI_SEC_WARN("SEC-GUARD-06: Unexpected fdesetup output: '%@'. "
+                     "Cannot determine FileVault status.", output);
+    }
+}
+
 void SecurityGuard::runStartupChecks() {
     NSLog(@"[igi] === Security Guard: running startup checks ===");
 
@@ -349,6 +412,7 @@ void SecurityGuard::runStartupChecks() {
     // Soft checks — log and continue.
     adviseDmaThreats();         // T-2: Thunderbolt DMA
     auditAccessibilityGrants(); // T-4, T-5: AX permission exposure
+    checkFileVault();           // T-2: disk encryption status (cold boot / SSD extraction)
 
     NSLog(@"[igi] === Security Guard: startup checks complete ===");
 }

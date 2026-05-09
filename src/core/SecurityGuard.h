@@ -24,13 +24,14 @@ public:
 
 private:
     // Hard checks — abort on failure.
-    static void checkDyldInjection();      // SEC-GUARD-01
-    static void checkHardenedRuntime();    // SEC-GUARD-02
-    static void checkDependencySignature();// SEC-GUARD-03
+    static void checkDyldInjection();       // SEC-GUARD-01
+    static void checkHardenedRuntime();     // SEC-GUARD-02
+    static void checkDependencySignature(); // SEC-GUARD-03
 
     // Soft checks — warn only.
-    static void adviseDmaThreats();        // SEC-GUARD-04
-    static void auditAccessibilityGrants();// SEC-GUARD-05
+    static void adviseDmaThreats();         // SEC-GUARD-04
+    static void auditAccessibilityGrants(); // SEC-GUARD-05
+    static void checkFileVault();           // SEC-GUARD-06
 };
 
 }  // namespace igi::core

@@ -1,0 +1,9 @@
+# Igi dependency lockfile
+# Generated: 2026-05-09T19:33:08Z
+# Update with: python3 scripts/verify_deps.py --update
+#
+# FORMAT: PACKAGE  VERSION  SHA256_OF_PRIMARY_DYLIB
+
+tesseract  5.5.2  582ce0fd695f673f5968e6f4b4e534d89a0d13ec2da5dbfe63c9a8d9fc86c2b3
+leptonica  1.87.0  66be5910156c234ecccdeddfc5fecf4d1a9353b1d0965640a8ded8cdfebef77c
+qt  6.11.0  NO_DYLIB
