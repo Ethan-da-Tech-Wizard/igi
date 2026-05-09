@@ -134,7 +134,7 @@ private:
 // Factory
 // ---------------------------------------------------------------------------
 std::unique_ptr<IHotkeyListener> IHotkeyListener::create() {
-    return std::make_unique<NSEventHotkeyListener>();
+    return std::make_unique<CarbonHotkeyListener>();
 }
 
 }  // namespace igi::core
