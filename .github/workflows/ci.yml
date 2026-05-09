@@ -27,6 +27,13 @@ jobs:
           echo "CMAKE_PREFIX_PATH=${QT_PREFIX}" >> "$GITHUB_ENV"
           echo "PKG_CONFIG_PATH=$(brew --prefix tesseract)/lib/pkgconfig:$(brew --prefix leptonica)/lib/pkgconfig" >> "$GITHUB_ENV"
 
+      # ── Dependency integrity check (T-1: poisoned Homebrew formula) ──────────
+      # Verifies that installed tesseract/leptonica versions and dylib SHA-256
+      # hashes match deps.lock. Any mismatch = hard CI failure.
+      # Update lockfile after intentional upgrades: python3 scripts/verify_deps.py --update
+      - name: Verify dependency integrity
+        run: python3 scripts/verify_deps.py
+
       - name: Configure
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 
