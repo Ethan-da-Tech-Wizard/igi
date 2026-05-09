@@ -14,6 +14,7 @@
 #include "ocr/OcrEngine.h"
 #include "SearchSession.h"
 #include "ui/SearchOverlay.h"
+#include "ui/CaptureFlashOverlay.h"
 
 #if defined(Q_OS_MACOS)
 extern "C" void igi_set_activation_policy_accessory();
@@ -97,10 +98,11 @@ int main(int argc, char* argv[]) {
 
     // ── Search overlay ──
     auto* overlay = new igi::ui::SearchOverlay;
+    auto* flashOverlay = new igi::ui::CaptureFlashOverlay;
 
     // ── Pipeline controller ──
     auto* session = new igi::SearchSession(
-        capture.get(), ocrEngine.get(), overlay);
+        capture.get(), ocrEngine.get(), overlay, flashOverlay);
 
     // ── Connect signal pipe to secure dismiss ──────────────────────────────
     // QSocketNotifier fires on the main thread (Qt event loop) when a byte

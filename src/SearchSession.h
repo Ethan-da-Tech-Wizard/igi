@@ -14,7 +14,10 @@
 #include "search/BoundingBox.h"
 
 namespace igi::core { class IScreenCapture; }
-namespace igi::ui   { class SearchOverlay;  }
+namespace igi::ui   { 
+    class SearchOverlay;
+    class CaptureFlashOverlay;
+}
 
 namespace igi {
 
@@ -36,6 +39,7 @@ public:
         core::IScreenCapture*  capture,
         ocr::OcrEngine*        ocrEngine,
         ui::SearchOverlay*     overlay,
+        ui::CaptureFlashOverlay* flashOverlay,
         QObject* parent = nullptr);
 
     // Trigger a new capture+OCR cycle.  Safe to call from the main thread.
@@ -52,6 +56,7 @@ private:
     core::IScreenCapture*   capture_;
     ocr::OcrEngine*         ocrEngine_;
     ui::SearchOverlay*      overlay_;
+    ui::CaptureFlashOverlay* flashOverlay_;
 
     // Physical-pixel rect of the most-recently captured window.
     QRect capturedScreenRect_;
