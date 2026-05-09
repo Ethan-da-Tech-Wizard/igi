@@ -188,14 +188,14 @@ int main(int argc, char* argv[]) {
                 QObject::connect(btn, &QPushButton::clicked,
                     [] { igi::core::openAccessibilitySettings(); });
             }
-            QPushButton* quitBtn = box->addButton(QMessageBox::Close);
+            QPushButton* closeBtn = box->addButton(QMessageBox::Close);
             box->setAttribute(Qt::WA_DeleteOnClose);
             box->setWindowFlags(box->windowFlags() | Qt::WindowStaysOnTopHint);
             
-            // Re-check permissions periodically if the dialog is open? No, if they click quit, exit.
             box->show();
             
-            QObject::connect(quitBtn, &QPushButton::clicked, qApp, &QCoreApplication::quit);
+            // Just close the dialog, do NOT quit the app!
+            QObject::connect(closeBtn, &QPushButton::clicked, box, &QMessageBox::close);
         });
 
     // ── THE PIPELINE WIRE ──
