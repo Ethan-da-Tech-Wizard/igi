@@ -41,8 +41,8 @@ class SearchOverlay final : public QWidget {
 public:
     explicit SearchOverlay(QWidget* parent = nullptr);
 
-    // Show the overlay and give focus to the search field.
-    void activate();
+    // Show the overlay and give focus to the search field, centered on targetScreen.
+    void activate(const QRect& targetScreen);
 
     // Update the yellow highlight rectangles painted over the captured window.
     // screenRect is the physical-pixel rect of the captured window (used to
