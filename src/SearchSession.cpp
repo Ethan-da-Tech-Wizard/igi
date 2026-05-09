@@ -47,10 +47,18 @@ void SearchSession::activate() {
     }
 
     capturedScreenRect_ = captureResult->screenRect;
+    devicePixelRatio_ = captureResult->screen.devicePixelRatio;
+    logicalScreenRect_ = QRect(
+        capturedScreenRect_.x() / devicePixelRatio_,
+        capturedScreenRect_.y() / devicePixelRatio_,
+        capturedScreenRect_.width() / devicePixelRatio_,
+        capturedScreenRect_.height() / devicePixelRatio_
+    );
+    
     const QImage& image = captureResult->image;
 
-    // Flash the visual border immediately (T-5 mitigation).
-    flashOverlay_->flash(capturedScreenRect_);
+    // Flash the visual border immediately using logical coordinates (T-5 mitigation).
+    flashOverlay_->flash(logicalScreenRect_);
 
     // ── 2. Convert QImage → PIX ──
     ocr::PixPtr pix = ocr::ImageConverter::qImageToPix(image);
@@ -209,29 +217,31 @@ void SearchSession::onOcrFinished() {
 void SearchSession::onQueryChanged(const QString& query) {
     if (corpus_.empty() || query.trimmed().isEmpty()) {
         // No corpus yet or empty query: clear highlights.
-        overlay_->setHighlights({}, capturedScreenRect_);
+        overlay_->setHighlights({}, logicalScreenRect_);
         return;
     }
 
     // ── Fuzzy search (always on main thread, stays within 16 ms budget) ──
     const auto matches = search::FuzzySearch::topK(query, corpus_, 20, 0.70f);
 
-    // Convert WordBox pixel rects to absolute screen rects by offsetting
-    // by the captured window's top-left corner.
+    // Convert WordBox physical pixel rects to absolute logical screen rects.
     const QPoint origin = capturedScreenRect_.topLeft();
     std::vector<QRect> highlightRects;
     highlightRects.reserve(matches.size());
 
     for (const auto& m : matches) {
         const auto& wb = m.word;
+        int physX = origin.x() + wb.x;
+        int physY = origin.y() + wb.y;
+        
         highlightRects.emplace_back(
-            origin.x() + wb.x,
-            origin.y() + wb.y,
-            wb.w,
-            wb.h);
+            physX / devicePixelRatio_,
+            physY / devicePixelRatio_,
+            wb.w / devicePixelRatio_,
+            wb.h / devicePixelRatio_);
     }
 
-    overlay_->setHighlights(highlightRects, capturedScreenRect_);
+    overlay_->setHighlights(highlightRects, logicalScreenRect_);
 
     qDebug() << "[igi] SearchSession:" << matches.size()
              << "match(es) for" << query;
