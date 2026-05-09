@@ -36,6 +36,7 @@ add_library(igi_core STATIC
     src/search/FuzzySearch.cpp
     src/SearchSession.cpp
     src/ui/SearchOverlay.cpp
+    src/ui/CaptureFlashOverlay.cpp
 )
 
 # macOS-only: Objective-C++ sources for system framework integrations.

@@ -8,6 +8,7 @@
 #include "ocr/OcrEngine.h"
 #include "search/FuzzySearch.h"
 #include "ui/SearchOverlay.h"
+#include "ui/CaptureFlashOverlay.h"
 
 namespace igi {
 
@@ -15,11 +16,13 @@ SearchSession::SearchSession(
     core::IScreenCapture* capture,
     ocr::OcrEngine*       ocrEngine,
     ui::SearchOverlay*    overlay,
+    ui::CaptureFlashOverlay* flashOverlay,
     QObject*              parent)
     : QObject(parent)
     , capture_(capture)
     , ocrEngine_(ocrEngine)
     , overlay_(overlay)
+    , flashOverlay_(flashOverlay)
 {
     // Wire OCR completion back to this object.
     connect(&ocrWatcher_, &QFutureWatcher<std::vector<search::WordBox>>::finished,
@@ -45,6 +48,9 @@ void SearchSession::activate() {
 
     capturedScreenRect_ = captureResult->screenRect;
     const QImage& image = captureResult->image;
+
+    // Flash the visual border immediately (T-5 mitigation).
+    flashOverlay_->flash(capturedScreenRect_);
 
     // ── 2. Convert QImage → PIX ──
     ocr::PixPtr pix = ocr::ImageConverter::qImageToPix(image);
