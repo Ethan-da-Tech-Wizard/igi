@@ -1,5 +1,10 @@
 #include "SearchSession.h"
 
+#ifdef Q_OS_WIN
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #include "core/SecureWipe.h"   // igi_bzero (compiler-elision-proof wipe)
 #include <QDebug>
 
@@ -139,15 +144,27 @@ void SearchSession::mlockCorpus() {
     for (const auto& wb : corpus_) {
         if (!wb.text.isEmpty()) {
             const void* p = wb.text.constData();
+#ifndef Q_OS_WIN
             if (::mlock(p, static_cast<size_t>(wb.text.size()) * sizeof(QChar)) != 0) {
                 ++failCount;
             }
+#else
+            if (!::VirtualLock(const_cast<void*>(p), static_cast<size_t>(wb.text.size()) * sizeof(QChar))) {
+                ++failCount;
+            }
+#endif
         }
         if (!wb.normalizedText.isEmpty()) {
             const void* p = wb.normalizedText.constData();
+#ifndef Q_OS_WIN
             if (::mlock(p, static_cast<size_t>(wb.normalizedText.size()) * sizeof(QChar)) != 0) {
                 ++failCount;
             }
+#else
+            if (!::VirtualLock(const_cast<void*>(p), static_cast<size_t>(wb.normalizedText.size()) * sizeof(QChar))) {
+                ++failCount;
+            }
+#endif
         }
     }
     corpusLocked_ = true;
@@ -183,12 +200,22 @@ void SearchSession::munlockAndWipeCorpus() {
     if (corpusLocked_) {
         for (const auto& wb : corpus_) {
             if (!wb.text.isEmpty()) {
+#ifndef Q_OS_WIN
                 ::munlock(wb.text.constData(),
                           static_cast<size_t>(wb.text.size()) * sizeof(QChar));
+#else
+                ::VirtualUnlock(const_cast<void*>(static_cast<const void*>(wb.text.constData())),
+                                static_cast<size_t>(wb.text.size()) * sizeof(QChar));
+#endif
             }
             if (!wb.normalizedText.isEmpty()) {
+#ifndef Q_OS_WIN
                 ::munlock(wb.normalizedText.constData(),
                           static_cast<size_t>(wb.normalizedText.size()) * sizeof(QChar));
+#else
+                ::VirtualUnlock(const_cast<void*>(static_cast<const void*>(wb.normalizedText.constData())),
+                                static_cast<size_t>(wb.normalizedText.size()) * sizeof(QChar));
+#endif
             }
         }
         corpusLocked_ = false;
