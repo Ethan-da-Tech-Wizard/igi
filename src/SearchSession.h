@@ -3,7 +3,9 @@
 #include <memory>
 #include <vector>
 
+#ifndef Q_OS_WIN
 #include <sys/mman.h>   // mlock / munlock
+#endif
 
 #include <QFutureWatcher>
 #include <QObject>

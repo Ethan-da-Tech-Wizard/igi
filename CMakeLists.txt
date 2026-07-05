@@ -21,9 +21,30 @@ option(IGI_BUILD_TESTS "Build the Igi unit test suite" ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Concurrent)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(TESSERACT REQUIRED tesseract)
-pkg_check_modules(LEPTONICA REQUIRED lept)
+if(UNIX)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(TESSERACT REQUIRED tesseract)
+    pkg_check_modules(LEPTONICA REQUIRED lept)
+    if(NOT APPLE)
+        find_package(X11 REQUIRED)
+    endif()
+endif()
+
+if(WIN32)
+    find_package(PkgConfig)
+    if(PKG_CONFIG_FOUND)
+        pkg_check_modules(TESSERACT tesseract)
+        pkg_check_modules(LEPTONICA lept)
+    endif()
+    if(NOT TESSERACT_FOUND)
+        find_path(TESSERACT_INCLUDE_DIRS NAMES tesseract/baseapi.h)
+        find_library(TESSERACT_LIBRARIES NAMES tesseract)
+    endif()
+    if(NOT LEPTONICA_FOUND)
+        find_path(LEPTONICA_INCLUDE_DIRS NAMES leptonica/allheaders.h)
+        find_library(LEPTONICA_LIBRARIES NAMES lept leptonica)
+    endif()
+endif()
 
 # Core library: shared between the igi executable and the test suite.
 # Keeping logic in a library lets us link tests directly against the
@@ -37,9 +58,10 @@ add_library(igi_core STATIC
     src/SearchSession.cpp
     src/ui/SearchOverlay.cpp
     src/ui/CaptureFlashOverlay.cpp
+    resources/resources.qrc
 )
 
-# macOS-only: Objective-C++ sources for system framework integrations.
+# Platform-specific backend integrations.
 if(APPLE)
     target_sources(igi_core PRIVATE
         src/core/AppPolicy.mm
@@ -58,6 +80,28 @@ if(APPLE)
         "-framework CoreFoundation"
         "-framework Security"
         "-framework IOKit"
+    )
+elseif(UNIX AND NOT APPLE)
+    target_sources(igi_core PRIVATE
+        src/core/ActiveWindowInspector_linux.cpp
+        src/core/HotkeyListener_linux.cpp
+        src/core/Permissions_stub.cpp
+        src/core/ScreenCapture_qt.cpp
+        src/core/SecurityGuard_linux.cpp
+    )
+    target_link_libraries(igi_core PUBLIC
+        X11::X11
+    )
+elseif(WIN32)
+    target_sources(igi_core PRIVATE
+        src/core/ActiveWindowInspector_win.cpp
+        src/core/HotkeyListener_win.cpp
+        src/core/Permissions_stub.cpp
+        src/core/ScreenCapture_qt.cpp
+        src/core/SecurityGuard_win.cpp
+    )
+    target_link_libraries(igi_core PUBLIC
+        dwmapi
     )
 endif()
 
@@ -79,14 +123,22 @@ target_link_libraries(igi_core PUBLIC
     ${LEPTONICA_LIBRARIES}
 )
 
-target_link_directories(igi_core PUBLIC
-    ${TESSERACT_LIBRARY_DIRS}
-    ${LEPTONICA_LIBRARY_DIRS}
-)
+if(TESSERACT_LIBRARY_DIRS)
+    target_link_directories(igi_core PUBLIC ${TESSERACT_LIBRARY_DIRS})
+endif()
+if(LEPTONICA_LIBRARY_DIRS)
+    target_link_directories(igi_core PUBLIC ${LEPTONICA_LIBRARY_DIRS})
+endif()
 
-add_executable(igi MACOSX_BUNDLE
-    src/main.cpp
-)
+if(APPLE)
+    add_executable(igi MACOSX_BUNDLE
+        src/main.cpp
+    )
+else()
+    add_executable(igi
+        src/main.cpp
+    )
+endif()
 
 target_link_libraries(igi PRIVATE igi_core)
 

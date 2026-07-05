@@ -1,5 +1,12 @@
 #include <csignal>
+#ifndef Q_OS_WIN
 #include <unistd.h>   // pipe(), write(), read()
+#else
+#include <io.h>
+#define close _close
+#define read _read
+#define write _write
+#endif
 
 #include <QApplication>
 #include <QDebug>
@@ -15,6 +22,7 @@
 #include "core/Permissions.h"
 #include "core/ScreenCapture.h"
 #include "core/SecurityGuard.h"
+#include "core/PlatformHotkey.h"
 #include "ocr/OcrEngine.h"
 #include "SearchSession.h"
 #include "ui/SearchOverlay.h"
@@ -24,6 +32,7 @@
 extern "C" void igi_set_activation_policy_accessory();
 #endif
 
+#ifndef Q_OS_WIN
 // ── POSIX signal → Qt event bridge (self-pipe trick) ─────────────────────────
 //
 // THREAT (T-2): If Igi is killed (SIGTERM from the OS, SIGINT from Ctrl+C, or
@@ -64,6 +73,7 @@ static bool setupSignalHandler() {
     sigaction(SIGQUIT, &sa, nullptr);
     return true;
 }
+#endif
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -85,7 +95,11 @@ int main(int argc, char* argv[]) {
 
     // ── Signal handling: wire SIGTERM/SIGINT/SIGQUIT → dismiss() ──────────────
     // Must be set up before any session is created so the pipe is ready.
+#ifndef Q_OS_WIN
     const bool sigOk = setupSignalHandler();
+#else
+    const bool sigOk = false;
+#endif
 
     // ── OCR engine ──
     // Initialised once at startup and reused across all sessions.
@@ -111,6 +125,7 @@ int main(int argc, char* argv[]) {
     // ── Connect signal pipe to secure dismiss ──────────────────────────────
     // QSocketNotifier fires on the main thread (Qt event loop) when a byte
     // arrives in the pipe — this is where we can safely call Qt and C++ code.
+#ifndef Q_OS_WIN
     if (sigOk) {
         auto* sigNotifier = new QSocketNotifier(g_sigPipe[0],
                                                  QSocketNotifier::Read, &app);
@@ -129,18 +144,23 @@ int main(int argc, char* argv[]) {
         qDebug() << "[igi] Signal handler installed "
                     "(SIGTERM/SIGINT/SIGQUIT → secure dismiss).";
     }
+#endif
 
     // ── System Tray Icon (Menu Bar) ──
     QSystemTrayIcon trayIcon;
-    // Load the .icns file from the macOS app bundle structure.
+    // Load the icon from macOS app bundle structure or from resources on other platforms.
+#if defined(Q_OS_MACOS)
     QIcon icon(QCoreApplication::applicationDirPath() + "/../Resources/AppIcon.icns");
+#else
+    QIcon icon(QStringLiteral(":/resources/AppIcon.png"));
+#endif
     trayIcon.setIcon(icon);
     
     QMenu trayMenu;
     QAction* titleAction = trayMenu.addAction("Igi OCR Search");
     titleAction->setEnabled(false);
     
-    QAction* hotkeyAction = trayMenu.addAction("Hotkey: Cmd+Shift+9");
+    QAction* hotkeyAction = trayMenu.addAction("Hotkey: " + igi::core::kPlatformHotkeyLabel);
     hotkeyAction->setEnabled(false);
     
     trayMenu.addSeparator();
@@ -203,7 +223,7 @@ int main(int argc, char* argv[]) {
         session, &igi::SearchSession::activate);
 
     daemon.start();
-    qDebug() << "[igi] Daemon started. Listening for Cmd+Shift+9…";
+    qDebug() << "[igi] Daemon started. Listening for" << igi::core::kPlatformHotkeyLog << "…";
 
     int ret = app.exec();
 
@@ -211,8 +231,10 @@ int main(int argc, char* argv[]) {
     session->dismiss();
     daemon.stop();
 
+#ifndef Q_OS_WIN
     if (g_sigPipe[0] != -1) ::close(g_sigPipe[0]);
     if (g_sigPipe[1] != -1) ::close(g_sigPipe[1]);
+#endif
 
     return ret;
 }

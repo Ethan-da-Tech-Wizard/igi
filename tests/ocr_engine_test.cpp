@@ -22,14 +22,14 @@ TEST(OcrEngine, RecognizeExtractsWordsAndRunsAsync) {
     ASSERT_TRUE(engine.init());
 
     // Create a golden image with text
-    QImage image(400, 100, QImage::Format_ARGB32);
+    QImage image(800, 400, QImage::Format_ARGB32);
     image.fill(Qt::white);
     
     QPainter painter(&image);
-    QFont font("Helvetica", 24);
+    QFont font(QStringLiteral("DejaVu Sans"), 36);
     painter.setFont(font);
     painter.setPen(Qt::black);
-    painter.drawText(image.rect(), Qt::AlignCenter, "PATIENT REPORT");
+    painter.drawText(QRect(0, 0, 800, 100), Qt::AlignCenter, "PATIENT REPORT");
     painter.end();
 
     PixPtr pix = ImageConverter::qImageToPix(image);

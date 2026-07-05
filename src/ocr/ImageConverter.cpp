@@ -3,7 +3,12 @@
 #include <cstddef>
 #include <cstdint>
 
+#ifndef Q_OS_WIN
 #include <sys/mman.h>   // mlock / munlock
+#else
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 #include <QImage>
 
@@ -70,7 +75,11 @@ PixPtr ImageConverter::qImageToPix(const QImage& source) {
     // still a full-page lock.
     bool imageLocked = false;
     if (imgBits && imgBytes > 0) {
+#ifndef Q_OS_WIN
         imageLocked = (::mlock(imgBits, imgBytes) == 0);
+#else
+        imageLocked = (::VirtualLock(const_cast<void*>(imgBits), imgBytes) != 0);
+#endif
         if (!imageLocked) {
             // Non-fatal: proceed without lock. Log via qDebug — this fires
             // on the OCR worker thread, not the main thread.
@@ -81,7 +90,11 @@ PixPtr ImageConverter::qImageToPix(const QImage& source) {
     // ── Allocate output PIX ───────────────────────────────────────────────────
     Pix* pix = pixCreate(w, h, 32);
     if (!pix) {
+#ifndef Q_OS_WIN
         if (imageLocked) ::munlock(imgBits, imgBytes);
+#else
+        if (imageLocked) ::VirtualUnlock(const_cast<void*>(imgBits), imgBytes);
+#endif
         return PixPtr{};
     }
 
@@ -107,7 +120,11 @@ PixPtr ImageConverter::qImageToPix(const QImage& source) {
     // ── Munlock the QImage buffer ─────────────────────────────────────────────
     // We munlock AFTER the copy is complete. The raw pixel data stays in locked
     // RAM during the entire conversion — zero window for page-out.
+#ifndef Q_OS_WIN
     if (imageLocked) ::munlock(imgBits, imgBytes);
+#else
+    if (imageLocked) ::VirtualUnlock(const_cast<void*>(imgBits), imgBytes);
+#endif
 
     return PixPtr{pix};
 }

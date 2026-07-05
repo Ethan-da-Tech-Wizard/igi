@@ -5,6 +5,12 @@
 #include <QRect>
 #include <QString>
 
+#if defined(Q_OS_WIN)
+using pid_t = qint64;
+#else
+#include <sys/types.h>
+#endif
+
 namespace igi::core {
 
 struct ActiveWindowInfo {

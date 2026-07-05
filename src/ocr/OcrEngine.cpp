@@ -4,7 +4,12 @@
 #include <cstdlib>
 #include <string>
 
-#include <sys/mman.h>   // mlock / munlock
+#ifndef Q_OS_WIN
+#  include <sys/mman.h>   // mlock / munlock
+#else
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#endif
 
 #include <QtConcurrent>
 
@@ -164,7 +169,11 @@ OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
             const std::size_t pixBytes =
                 static_cast<std::size_t>(pixGetWpl(fullPix)) *
                 static_cast<std::size_t>(H) * sizeof(l_uint32);
+#ifndef Q_OS_WIN
             const bool mlockOk = (::mlock(pixData, pixBytes) == 0);
+#else
+            const bool mlockOk = (::VirtualLock(pixData, pixBytes) != 0);
+#endif
 
             // ── Fan out: one QtConcurrent task per strip ──────────────────
             struct StripFuture {
@@ -232,7 +241,11 @@ OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
             // wipe and munlock here — before the deleter — to shorten the
             // window during which raw pixel PHI is in lockable RAM.
             igi_bzero(pixData, pixBytes);
+#ifndef Q_OS_WIN
             if (mlockOk) ::munlock(pixData, pixBytes);
+#else
+            if (mlockOk) ::VirtualUnlock(pixData, pixBytes);
+#endif
             // PixPtr destructor will call pixDestroy (data already zeroed).
 
             return merged;
