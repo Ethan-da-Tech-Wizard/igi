@@ -31,3 +31,42 @@ This tool requires raw power and memory control. It is built using:
 - **C++ (Qt Framework):** For the lightning-fast, cross-platform user interface, global hotkey detection, and floating search bar overlay.
 - **C++ (libtesseract):** The raw, native OCR engine for high-performance text extraction.
 - **C++ (MuPDF/Leptonica):** For securely ingesting complex PDFs and active-window captures directly into RAM without touching the hard drive. MuPDF is used for its superior speed and lightweight memory footprint.
+
+## 📦 Get Igi — one file per OS, or build it yourself
+
+Igi began life macOS-only. The macOS app is unchanged and remains the
+reference implementation; Windows and Linux support is being added around it
+(see `docs/CROSS_PLATFORM_PLAN.md` and decision D-008). The goal: however you
+run it, getting Igi is **one single-file download** — or one build command.
+
+### 1. 🍎 macOS — `Igi.dmg` *(available now)*
+- Signed & notarized DMG, macOS 13+ (Universal Binary).
+- Download → drag **Igi** to Applications → launch → grant the two
+  permissions it asks for (Screen Recording + Accessibility). Done.
+
+### 2. 🪟 Windows — `IgiSetup-x64.exe` *(planned — Phase 3/4 of the port)*
+- Single-file installer with everything bundled (Qt, Tesseract, language
+  data). Windows 10 (1903) or later.
+- Download → run the installer → Igi lives in your system tray. Hotkey:
+  `Ctrl+Shift+F`.
+
+### 3. 🐧 Linux — `Igi-x86_64.AppImage` *(planned — Phase 1/2/4 of the port)*
+- One self-contained file, no root and no package manager needed:
+  `chmod +x Igi-x86_64.AppImage && ./Igi-x86_64.AppImage`
+- X11 fully supported; on Wayland, capture goes through the desktop portal
+  (the system asks your consent once) and search runs against the whole
+  active screen.
+
+### 4. 🛠 Build it yourself *(all platforms)*
+Full per-OS instructions land in `docs/BUILDING.md`; the short version:
+
+| OS | Dependencies | Build |
+|----|--------------|-------|
+| macOS | `brew install cmake qt tesseract leptonica pkg-config` | `cmake -B build && cmake --build build` |
+| Linux | `apt install cmake qt6-base-dev libtesseract-dev libleptonica-dev pkg-config` | `cmake -B build && cmake --build build` |
+| Windows | Visual Studio 2022 + vcpkg (`vcpkg.json` manifest) | `cmake --preset windows && cmake --build build` |
+
+> Every platform keeps the same guarantees: 100% offline, zero disk writes,
+> volatile-RAM-only, no telemetry. If an OS can't support a capability
+> (e.g., focused-window detection on Wayland), Igi degrades that feature
+> gracefully and tells you — it never crashes and never quietly stores data.
