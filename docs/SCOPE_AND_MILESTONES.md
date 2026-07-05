@@ -16,7 +16,7 @@ To prevent scope creep and ensure adherence to the ultra-low latency, zero-stora
 7. **Security:** Immediate volatile RAM purging upon search termination.
 
 ### 🔴 Out-of-Scope (Strictly Prohibited)
-1. **Platforms:** No Windows or Linux compatibility.
+1. **Platforms:** No Windows or Linux compatibility. *(Superseded 2026-07-05 by D-008 — see the dated update at the end of this document. Original text preserved per docs convention.)*
 2. **Cloud APIs:** No reliance on AWS Textract, Google Cloud Vision, or any external internet-based OCR APIs.
 3. **Storage:** No saving screenshots, log caches, or extracted text arrays to the local hard drive.
 4. **Tracking:** No telemetry, analytics, or user-tracking libraries.
@@ -70,3 +70,33 @@ To prevent scope creep and ensure adherence to the ultra-low latency, zero-stora
   6. `scripts/sign_and_notarize.sh` — ad-hoc (local) and Developer ID + notarization (CI) signing. ✅
   7. `scripts/sandbox_test.sh` + `resources/igi.sb` — D-007 write-deny test under `sandbox-exec`. ✅
   8. Two-job CI: `build-and-test` + `bundle-sign-sandbox` with conditional notarization on `main`. ✅
+
+---
+
+## 3. Scope Update — 2026-07-05 (D-008: Cross-Platform Expansion)
+
+> This section is additive. Sections 1–2 above are the original macOS-only
+> scope lock and completed milestones; they are preserved unchanged as the
+> historical record.
+
+Per decision `D-008` (`docs/DECISIONS.md`), the platform boundary in §1 is
+**superseded**: Igi will additionally target **Windows and Linux**, while the
+shipped macOS implementation (Milestones 1–6) remains untouched and remains
+the reference implementation. All other scope locks in §1 — no cloud APIs,
+no storage, no tracking, no PDF editing — continue to apply on every
+platform.
+
+Distribution goal: three single-file downloads (macOS `Igi.dmg` — available
+today; Windows `IgiSetup-x64.exe`; Linux `Igi-x86_64.AppImage`) plus a
+documented build-from-source path per OS.
+
+### Milestone 7: Cross-Platform Port (PLANNED)
+* Phase 0 — Portability groundwork (Linux CI compile gate, CMake platform blocks, presets).
+* Phase 1 — Linux X11 backend (hotkey, capture, active window).
+* Phase 2 — Linux Wayland via XDG portals with graceful degradation.
+* Phase 3 — Windows backend (RegisterHotKey, Windows.Graphics.Capture, ctrl-handler teardown).
+* Phase 4 — Packaging: AppImage + Windows installer + `docs/BUILDING.md`.
+* Phase 5 — Security-guarantee parity (per-OS SecurityGuard, write-deny tests, dependency locks).
+* Phase 6 — Docs/QA sweep, per-OS SLO baselines.
+
+Design + research: `docs/CROSS_PLATFORM_PLAN.md` · Task breakdown: `docs/CROSS_PLATFORM_TODO.md`.

@@ -130,3 +130,39 @@ The "zero-storage" guarantee applies to **writes**, not reads. Specifically:
 The Chunk 7 release sandbox test enforces this distinction by running the
 binary under a `sandbox-exec` profile that denies all writes outside an
 allowlisted test directory.
+
+---
+
+## D-008 — Cross-platform expansion (macOS preserved, Windows + Linux added)
+**Status:** Proposed (2026-07-05)
+
+Igi expands from macOS-only to macOS + Windows + Linux. This supersedes the
+"No Windows or Linux compatibility" line in `SCOPE_AND_MILESTONES.md` §1
+(the original text is preserved there with a dated supersession note, per
+the docs-are-append-only convention).
+
+Binding constraints:
+
+- **The macOS implementation is read-only for this effort.** All shipped
+  `.mm` backends, entitlements, signing, and the DMG flow stay untouched.
+  New platforms are added as sibling backends behind the existing factory
+  interfaces (`IHotkeyListener::create()`, `IScreenCapture::create()`, and
+  new factory seams for `Permissions`, `ActiveWindowInspector`,
+  `SecurityGuard`).
+- Platform code lives in separate translation units selected by CMake
+  (`if(APPLE)` / `if(WIN32)` / `if(UNIX AND NOT APPLE)`) — no inline
+  `#ifdef` soup in shared code.
+- Security guarantees (D-006 volatile purge, D-007 zero-write, offline-only)
+  hold identically on every OS; verification tooling differs per OS and any
+  gap is recorded in `RISK_REGISTER.md`.
+- A capability an OS cannot provide (e.g., focused-window identity on
+  Wayland) degrades the feature gracefully and visibly — it never crashes.
+- Distribution model: **three single-file downloads** — `Igi.dmg` (macOS,
+  ships today), `IgiSetup-x64.exe` (Windows), `Igi-x86_64.AppImage` (Linux)
+  — **plus a documented build-from-source path** per OS (`docs/BUILDING.md`,
+  `CMakePresets.json`).
+- D-002 latency and D-003 memory budgets remain macOS-calibrated; Windows
+  and Linux get their own measured baseline rows appended once benchmarked.
+
+Full design and research: `docs/CROSS_PLATFORM_PLAN.md`.
+Execution checklist: `docs/CROSS_PLATFORM_TODO.md`.
