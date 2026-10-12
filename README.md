@@ -19,7 +19,7 @@ To be perfectly clear on what this tool is and what it does:
 Igi operates as a pure utility. It does not try to be a clunky document manager. 
 
 1. You have an unsearchable 70-page scanned PDF open, or a heavily stylized website.
-2. You activate Igi via a global hotkey (e.g., `Cmd+Shift+F`).
+2. You activate Igi via a global hotkey (`Cmd+Shift+9` on macOS, `Ctrl+Shift+9` on Windows and Linux).
 3. Igi instantly detects the active window. For websites, it pulls visual data directly from the screen. For PDFs, it seamlessly detects the open file and ingests it into volatile RAM.
 4. You type your search term in the minimalist floating search bar.
 5. Igi finds the closest fuzzy match (forgiving common OCR errors) and draws a highlight over the word directly on your screen. 
@@ -30,7 +30,8 @@ Igi operates as a pure utility. It does not try to be a clunky document manager.
 This tool requires raw power and memory control. It is built using:
 - **C++ (Qt Framework):** For the lightning-fast, cross-platform user interface, global hotkey detection, and floating search bar overlay.
 - **C++ (libtesseract):** The raw, native OCR engine for high-performance text extraction.
-- **C++ (MuPDF/Leptonica):** For securely ingesting complex PDFs and active-window captures directly into RAM without touching the hard drive. MuPDF is used for its superior speed and lightweight memory footprint.
+- **C++ (Leptonica):** Holds active-window screen captures directly in RAM, without touching the hard drive.
+- **MuPDF *(planned, not yet used)*:** Today Igi captures the active window as an image and runs OCR on it; it does not parse PDF files itself. `docs/SRD.md` selects MuPDF for future direct PDF ingestion. MuPDF is AGPL-3.0, so adopting it will need a licensing decision for Igi, which is MIT.
 
 ## 📦 Get Igi — one file per OS, or build it yourself
 
@@ -48,7 +49,7 @@ run it, getting Igi is **one single-file download** — or one build command.
 - Single-file installer with everything bundled (Qt, Tesseract, language
   data). Windows 10 (1903) or later.
 - Download → run the installer → Igi lives in your system tray. Hotkey:
-  `Ctrl+Shift+F`.
+  `Ctrl+Shift+9`.
 
 ### 3. 🐧 Linux — `Igi-x86_64.AppImage` *(planned — Phase 1/2/4 of the port)*
 - One self-contained file, no root and no package manager needed:
@@ -58,15 +59,21 @@ run it, getting Igi is **one single-file download** — or one build command.
   active screen.
 
 ### 4. 🛠 Build it yourself *(all platforms)*
-Full per-OS instructions land in `docs/BUILDING.md`; the short version:
+The short version (a fuller `docs/BUILDING.md` is planned):
 
 | OS | Dependencies | Build |
 |----|--------------|-------|
 | macOS | `brew install cmake qt tesseract leptonica pkg-config` | `cmake -B build && cmake --build build` |
-| Linux | `apt install cmake qt6-base-dev libtesseract-dev libleptonica-dev pkg-config` | `cmake -B build && cmake --build build` |
-| Windows | Visual Studio 2022 + vcpkg (`vcpkg.json` manifest) | `cmake --preset windows && cmake --build build` |
+| Linux | `apt install cmake qt6-base-dev libtesseract-dev libleptonica-dev libx11-dev libgtest-dev libgmock-dev pkg-config` | `cmake -B build && cmake --build build` |
+| Windows *(untested)* | Visual Studio 2022 + vcpkg (`vcpkg install qtbase tesseract leptonica`) | `cmake --preset windows && cmake --build build` |
+
+On a headless machine (CI, containers), set `QT_QPA_PLATFORM=offscreen` before building, because the test binary runs once during the build to discover tests. Run the suite with `ctest --test-dir build`. To skip tests and their GoogleTest dependency, configure with `-DIGI_BUILD_TESTS=OFF`.
 
 > Every platform keeps the same guarantees: 100% offline, zero disk writes,
 > volatile-RAM-only, no telemetry. If an OS can't support a capability
 > (e.g., focused-window detection on Wayland), Igi degrades that feature
 > gracefully and tells you — it never crashes and never quietly stores data.
+
+## License
+
+Igi is released under the [MIT License](LICENSE). It links against Qt 6 (LGPL-3.0), Tesseract (Apache-2.0) and Leptonica (BSD-2-Clause), which keep their own licenses.
