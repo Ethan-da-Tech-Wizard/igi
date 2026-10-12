@@ -87,7 +87,7 @@ bool OcrEngine::init(const char* dataPath, const char* language) {
         if (w.api->Init(pPath, language) != 0) {
             return false;
         }
-        w.api->SetPageSegMode(tesseract::PSM_AUTO);
+        w.api->SetPageSegMode(tesseract::PSM_SPARSE_TEXT);
     }
     return true;
 }
@@ -158,9 +158,11 @@ OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
             const int W  = pixGetWidth(fullPix);
             const int H  = pixGetHeight(fullPix);
 
+            if (W <= 0 || H <= 0) return {};
+
             // ── Divide image into kOcrWorkers horizontal strips ───────────
             // Equal-height bands. The last strip absorbs any remainder rows.
-            const int stripH = H / kOcrWorkers;
+            const int stripH = std::max(1, H / kOcrWorkers);
 
             // ── mlock the pixel buffer before dispatching ─────────────────
             // The raw PIX data must not be paged out while workers read it.
@@ -178,13 +180,17 @@ OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
             // ── Fan out: one QtConcurrent task per strip ──────────────────
             struct StripFuture {
                 QFuture<std::vector<search::WordBox>> future;
+                bool valid = false;
             };
             std::array<StripFuture, kOcrWorkers> stripFutures;
 
             for (int i = 0; i < kOcrWorkers; ++i) {
                 const int yStart = i * stripH;
-                const int yEnd   = (i == kOcrWorkers - 1) ? H : yStart + stripH;
+                if (yStart >= H) break;
+                const int yEnd   = (i == kOcrWorkers - 1) ? H : std::min(H, yStart + stripH);
                 const int h      = yEnd - yStart;
+                if (h <= 0) break;
+
                 const int worker = (nextWorker_.fetch_add(1,
                                         std::memory_order_relaxed))
                                    % kOcrWorkers;
@@ -192,12 +198,15 @@ OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
                 // pixCreate a sub-pix clip (shallow: shares fullPix data).
                 // pixClipRectangle makes a deep copy — safe for concurrent use.
                 BOX* box = boxCreate(0, yStart, W, h);
+                if (!box) continue;
                 PIX* strip = pixClipRectangle(fullPix, box, nullptr);
                 boxDestroy(&box);
+                if (!strip) continue;
 
                 const int yOffset = yStart;
                 const int widx    = worker;
 
+                stripFutures[i].valid = true;
                 stripFutures[i].future = QtConcurrent::run(&workerPool_,
                     [this, strip, yOffset, pageIndex, widx]() mutable
                         -> std::vector<search::WordBox>
@@ -222,6 +231,7 @@ OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
             merged.reserve(static_cast<size_t>(W / 6)); // rough heuristic
 
             for (auto& sf : stripFutures) {
+                if (!sf.valid) continue;
                 sf.future.waitForFinished();
                 auto part = sf.future.result();
                 merged.insert(merged.end(),

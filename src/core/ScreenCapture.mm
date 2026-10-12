@@ -122,9 +122,10 @@ public:
             static_cast<int>(active->bounds.y() * screen.devicePixelRatio));
 
         CaptureResult result;
-        result.image      = std::move(image);
-        result.screenRect = QRect(topLeftPx, result.image.size());
-        result.screen     = screen;
+        result.image        = std::move(image);
+        result.screenRect   = QRect(topLeftPx, result.image.size());
+        result.screen       = screen;
+        result.activeWindow = *active;
         return result;
     }
 };

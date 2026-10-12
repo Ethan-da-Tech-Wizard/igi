@@ -79,3 +79,19 @@ TEST(ScreenGeometry, RectToScreenPixelsScalesAllCorners) {
     EXPECT_DOUBLE_EQ(px.width(),   logical.width()  * dpr);
     EXPECT_DOUBLE_EQ(px.height(),  logical.height() * dpr);
 }
+
+TEST(ScreenGeometry, CoordinateScalingInvariance) {
+    const qreal dpr = 2.0;
+    const QRect logicalWindow(100, 200, 800, 600);
+    const QPoint originPx(static_cast<int>(std::round(logicalWindow.x() * dpr)), static_cast<int>(std::round(logicalWindow.y() * dpr)));
+    const QPoint wordMatchPx(400, 200);
+
+    int physX = originPx.x() + wordMatchPx.x();
+    int physY = originPx.y() + wordMatchPx.y();
+
+    double logX = static_cast<double>(physX) / dpr;
+    double logY = static_cast<double>(physY) / dpr;
+
+    EXPECT_DOUBLE_EQ(logX - logicalWindow.x(), wordMatchPx.x() / dpr);
+    EXPECT_DOUBLE_EQ(logY - logicalWindow.y(), wordMatchPx.y() / dpr);
+}

@@ -6,14 +6,16 @@
 #include <QImage>
 #include <QRect>
 
+#include "core/ActiveWindowInspector.h"
 #include "core/ScreenGeometry.h"
 
 namespace igi::core {
 
 struct CaptureResult {
-    QImage     image;        // Format_ARGB32, ready for ImageConverter
-    QRect      screenRect;   // physical-pixel rect of the captured window
-    ScreenInfo screen;       // which display the window lives on
+    QImage           image;        // Format_ARGB32, ready for ImageConverter
+    QRect            screenRect;   // physical-pixel rect of the captured window
+    ScreenInfo       screen;       // which display the window lives on
+    ActiveWindowInfo activeWindow; // active window metadata including documentPath
 };
 
 // Abstraction over the OS screen-capture API. Tests use a mock; the

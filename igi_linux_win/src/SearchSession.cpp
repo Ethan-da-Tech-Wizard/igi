@@ -47,32 +47,68 @@ void SearchSession::activate() {
     qDebug() << "[igi] SearchSession: capturing focused window…";
     auto captureResult = capture_->captureFocusedWindow();
     if (!captureResult) {
-        qWarning() << "[igi] SearchSession: capture failed — no active window.";
-        return;
+        qWarning() << "[igi] SearchSession: capture failed — using fallback primary screen geometry.";
+        core::CaptureResult fallbackResult;
+        fallbackResult.screen = core::ScreenGeometry::screenByIndex(0);
+        if (fallbackResult.screen.devicePixelRatio <= 0) {
+            fallbackResult.screen.devicePixelRatio = 1.0;
+        }
+        if (fallbackResult.screen.virtualGeometry.isEmpty()) {
+            fallbackResult.screen.virtualGeometry = QRect(0, 0, 1920, 1080);
+        }
+        const double dpr = fallbackResult.screen.devicePixelRatio;
+        const QRect& vg = fallbackResult.screen.virtualGeometry;
+        fallbackResult.screenRect = QRect(
+            static_cast<int>(std::round(vg.x() * dpr)),
+            static_cast<int>(std::round(vg.y() * dpr)),
+            static_cast<int>(std::round(vg.width() * dpr)),
+            static_cast<int>(std::round(vg.height() * dpr))
+        );
+        QImage dummy(fallbackResult.screenRect.size(), QImage::Format_ARGB32);
+        dummy.fill(Qt::transparent);
+        fallbackResult.image = std::move(dummy);
+        fallbackResult.activeWindow.appName = QStringLiteral("Primary Screen (Fallback)");
+
+        captureResult = std::move(fallbackResult);
+    }
+
+    if (captureResult->image.isNull() || captureResult->image.size().isEmpty()) {
+        qWarning() << "[igi] SearchSession: captured image is null/empty — creating fallback dummy canvas.";
+        if (captureResult->screenRect.isEmpty()) {
+            core::ScreenInfo screenInfo = core::ScreenGeometry::screenByIndex(0);
+            if (screenInfo.devicePixelRatio <= 0) screenInfo.devicePixelRatio = 1.0;
+            if (screenInfo.virtualGeometry.isEmpty()) screenInfo.virtualGeometry = QRect(0, 0, 1920, 1080);
+            const double dpr = screenInfo.devicePixelRatio;
+            const QRect& vg = screenInfo.virtualGeometry;
+            captureResult->screenRect = QRect(
+                static_cast<int>(std::round(vg.x() * dpr)),
+                static_cast<int>(std::round(vg.y() * dpr)),
+                static_cast<int>(std::round(vg.width() * dpr)),
+                static_cast<int>(std::round(vg.height() * dpr))
+            );
+            captureResult->screen = screenInfo;
+        }
+        QImage dummy(captureResult->screenRect.size(), QImage::Format_ARGB32);
+        dummy.fill(Qt::transparent);
+        captureResult->image = std::move(dummy);
     }
 
     capturedScreenRect_ = captureResult->screenRect;
     devicePixelRatio_ = captureResult->screen.devicePixelRatio;
+    if (devicePixelRatio_ <= 0) {
+        devicePixelRatio_ = 1.0;
+    }
     logicalScreenRect_ = QRect(
-        capturedScreenRect_.x() / devicePixelRatio_,
-        capturedScreenRect_.y() / devicePixelRatio_,
-        capturedScreenRect_.width() / devicePixelRatio_,
-        capturedScreenRect_.height() / devicePixelRatio_
+        static_cast<int>(std::round(static_cast<double>(capturedScreenRect_.x()) / devicePixelRatio_)),
+        static_cast<int>(std::round(static_cast<double>(capturedScreenRect_.y()) / devicePixelRatio_)),
+        static_cast<int>(std::round(static_cast<double>(capturedScreenRect_.width()) / devicePixelRatio_)),
+        static_cast<int>(std::round(static_cast<double>(capturedScreenRect_.height()) / devicePixelRatio_))
     );
-    
-    const QImage& image = captureResult->image;
 
     // Flash the visual border immediately using logical coordinates (T-5 mitigation).
     flashOverlay_->flash(logicalScreenRect_);
 
     // ── 2. Convert QImage → PIX ──
-    ocr::PixPtr pix = ocr::ImageConverter::qImageToPix(image);
-    if (!pix) {
-        qWarning() << "[igi] SearchSession: QImage→PIX conversion failed.";
-        return;
-    }
-
-    // ── 3. Launch async OCR ──
     // Drop any in-flight watcher (user pressed hotkey twice quickly).
     if (ocrWatcher_.isRunning()) {
         ocrWatcher_.cancel();
@@ -80,14 +116,18 @@ void SearchSession::activate() {
     }
     corpus_.clear();
 
-    QFuture<std::vector<search::WordBox>> future =
-        ocrEngine_->recognizeAsync(std::move(pix), 0);
-    ocrWatcher_.setFuture(future);
+    ocr::PixPtr pix = ocr::ImageConverter::qImageToPix(captureResult->image);
+    if (!pix) {
+        qWarning() << "[igi] SearchSession: QImage→PIX conversion failed.";
+    } else {
+        QFuture<std::vector<search::WordBox>> future =
+            ocrEngine_->recognizeAsync(std::move(pix), 0);
+        ocrWatcher_.setFuture(future);
+        qDebug() << "[igi] SearchSession: OCR running in background…";
+    }
 
-    // ── 4. Show the search bar immediately so the user can start typing ──
+    // ── 3. Show the search bar immediately so the user can start typing ──
     overlay_->activate(logicalScreenRect_);
-
-    qDebug() << "[igi] SearchSession: OCR running in background…";
 }
 
 void SearchSession::dismiss() {

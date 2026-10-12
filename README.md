@@ -63,8 +63,11 @@ Full per-OS instructions land in `docs/BUILDING.md`; the short version:
 | OS | Dependencies | Build |
 |----|--------------|-------|
 | macOS | `brew install cmake qt tesseract leptonica pkg-config` | `cmake -B build && cmake --build build` |
-| Linux | `apt install cmake qt6-base-dev libtesseract-dev libleptonica-dev pkg-config` | `cmake -B build && cmake --build build` |
+| Arch Linux | `pacman -S cmake qt6-base tesseract tesseract-data-eng leptonica pkgconf` | `cmake -B build && cmake --build build` |
+| Ubuntu / Debian | `apt install cmake qt6-base-dev libtesseract-dev libleptonica-dev pkg-config` | `cmake -B build && cmake --build build` |
 | Windows | Visual Studio 2022 + vcpkg (`vcpkg.json` manifest) | `cmake --preset windows && cmake --build build` |
+
+> **Note on Viewport Search:** Igi performs zero-disk visual OCR on the currently visible screen pixels of your active window. When scrolling through long web pages or multi-page documents, simply press `Ctrl+Shift+F` (or `Cmd+Shift+F` on macOS) at any scroll position to instantly capture and search the newly visible viewport.
 
 > Every platform keeps the same guarantees: 100% offline, zero disk writes,
 > volatile-RAM-only, no telemetry. If an OS can't support a capability
