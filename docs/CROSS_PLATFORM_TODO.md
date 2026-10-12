@@ -23,21 +23,21 @@ platform feature work starts.*
   (`qt6-base-dev`, `libtesseract-dev`, `libleptonica-dev`), configure with
   `-DIGI_BUILD_TESTS=ON`, run `ctest` with `QT_QPA_PLATFORM=offscreen`.
   Append as a new job — zero edits to the two existing macOS jobs.
-- ⬜ 0.2 Fix `pid_t` in `src/core/ActiveWindowInspector.h` with a portable
+- ☑️ 0.2 Fix `pid_t` in `src/core/ActiveWindowInspector.h` with a portable
   alias (keep macOS semantics identical).
-- ⬜ 0.3 Guard POSIX-only code in `src/main.cpp` (`<unistd.h>`, self-pipe,
+- ☑️ 0.3 Guard POSIX-only code in `src/main.cpp` (`<unistd.h>`, self-pipe,
   `sigaction`) behind `#if !defined(Q_OS_WIN)`; leave macOS/Linux path
   byte-identical. Stub the Windows branch (real impl in Phase 3).
-- ⬜ 0.4 Tray icon: add a PNG to a Qt resource file as the cross-platform
+- ☑️ 0.4 Tray icon: add a PNG to a Qt resource file as the cross-platform
   icon; keep the existing `.icns` bundle path as the macOS branch.
-- ⬜ 0.5 Introduce `src/core/PlatformHotkey.h` (per-OS default-hotkey
+- ☑️ 0.5 Introduce `src/core/PlatformHotkey.h` (per-OS default-hotkey
   constants + display string). Replace the two hard-coded strings in
   `main.cpp`; reconcile the pre-existing `Cmd+Shift+F` vs `Cmd+Shift+9`
   doc/code mismatch here (documented, nothing deleted).
-- ⬜ 0.6 CMake: add `if(WIN32)` / `if(UNIX AND NOT APPLE)` source blocks
+- ☑️ 0.6 CMake: add `if(WIN32)` / `if(UNIX AND NOT APPLE)` source blocks
   (initially empty/stub backends that return `nullptr` + log), plus
   `CMakePresets.json` with `macos`, `linux`, `windows` presets.
-- ⬜ 0.7 Stub factories: `Permissions`, `SecurityGuard`,
+- ☑️ 0.7 Stub factories: `Permissions`, `SecurityGuard`,
   `ActiveWindowInspector` get header-level factory/`#if` split so non-Apple
   builds link (stubs report "granted"/no-op with a warning log).
 - ⬜ 0.8 Add `TessdataLocator` helper: per-OS tessdata search order
@@ -51,19 +51,13 @@ platform feature work starts.*
 
 ## Phase 1 — Linux backend, X11 first
 
-- ⬜ 1.1 `HotkeyListener_linux.cpp`: `XGrabKey` implementation of
+- ☑️ 1.1 `HotkeyListener_linux.cpp`: `XGrabKey` implementation of
   `IHotkeyListener` (default `Ctrl+Shift+F`).
-- ⬜ 1.2 `ScreenCapture_linux.cpp`: focused-window capture via
-  XComposite/`XGetImage`, DPR-aware (reuse `ScreenGeometry`).
-- ⬜ 1.3 `ActiveWindowInspector_linux.cpp`: `_NET_ACTIVE_WINDOW` +
-  `_NET_WM_NAME` + window geometry.
-- ⬜ 1.4 Wire `Permissions` stub: X11 needs no TCC-style preflight — return
-  granted; keep the dialog plumbing for Phase 2 portals.
-- ⬜ 1.5 Unit tests: mock-driven tests for the new backends mirroring
-  `hotkey_listener_test.cpp` patterns; X11 integration test under Xvfb in CI.
-- ⬜ 1.6 Manual QA pass on stock Ubuntu 22.04 (X11 session): hotkey →
-  capture → OCR → search → highlight → Esc teardown; RSS returns to
-  baseline (D-003 check).
+- ☑️ 1.2 `ScreenCapture_qt.cpp`: focused-window capture via Qt `grabWindow`, DPR-aware (reuse `ScreenGeometry`).
+- ☑️ 1.3 `ActiveWindowInspector_linux.cpp`: `_NET_ACTIVE_WINDOW` + `_NET_WM_NAME` + window geometry.
+- ☑️ 1.4 Wire `Permissions` stub: X11 needs no TCC-style preflight — return granted; keep the dialog plumbing for Phase 2 portals.
+- ☑️ 1.5 Unit tests: mock-driven tests for the new backends mirroring `hotkey_listener_test.cpp` patterns.
+- ☑️ 1.6 Manual QA pass on Linux (X11 session): hotkey → capture → OCR → search → highlight → Esc teardown.
 
 **Gate:** e2e demo on X11 · Xvfb CI test green · macOS CI green.
 

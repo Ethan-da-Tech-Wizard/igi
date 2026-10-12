@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=igi
+GenericName=igi
+Comment=igi
+Exec=igi
+Icon=AppIcon
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=igi;
+StartupNotify=false

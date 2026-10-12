@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <queue>
 #include <math.h>
+#include <QRegularExpression>
 
 namespace igi::search {
 
@@ -79,27 +80,76 @@ std::vector<Match> FuzzySearch::topK(const QString& query, const std::vector<Wor
     }
 
     // Min-heap to keep track of the top-K matches
-    // Pair: {score, index in corpus}
-    auto cmp = [](const std::pair<float, int>& a, const std::pair<float, int>& b) {
+    auto cmp = [](const Match& a, const Match& b) {
         // We want the smallest score at the top of the min-heap
-        return a.first > b.first;
+        return a.score > b.score;
     };
-    std::priority_queue<std::pair<float, int>, std::vector<std::pair<float, int>>, decltype(cmp)> minHeap(cmp);
+    std::priority_queue<Match, std::vector<Match>, decltype(cmp)> minHeap(cmp);
 
     std::vector<int> prevRow;
     std::vector<int> currRow;
 
     for (int i = 0; i < corpus.size(); ++i) {
-        const WordBox& wordBox = corpus[i];
+        QString windowText;
+        QString windowNorm;
+        int minX = corpus[i].x;
+        int minY = corpus[i].y;
+        int maxX = corpus[i].x + corpus[i].w;
+        int maxY = corpus[i].y + corpus[i].h;
         
-        float score = calculateScore(queryNorm, wordBox.normalizedText, threshold, prevRow, currRow);
+        int estimatedWords = query.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts).size();
+        if (estimatedWords == 0) estimatedWords = 1;
         
-        if (score >= threshold) {
-            if (minHeap.size() < static_cast<size_t>(k)) {
-                minHeap.push({score, i});
-            } else if (score > minHeap.top().first) {
-                minHeap.pop();
-                minHeap.push({score, i});
+        for (int w = 0; w < estimatedWords && i + w < corpus.size(); ++w) {
+            const WordBox& currentWord = corpus[i + w];
+            if (w > 0) {
+                windowText += " ";
+            }
+            windowText += currentWord.text;
+            windowNorm += currentWord.normalizedText;
+            
+            minX = std::min(minX, currentWord.x);
+            minY = std::min(minY, currentWord.y);
+            maxX = std::max(maxX, currentWord.x + currentWord.w);
+            maxY = std::max(maxY, currentWord.y + currentWord.h);
+
+            float score = 0.0f;
+
+            // Prevent visual overload for very short queries (1-2 characters)
+            // by restricting matches to exact or prefix only.
+            if (queryNorm.length() <= 2) {
+                if (windowNorm == queryNorm) {
+                    score = 1.0f;
+                } else if (windowNorm.startsWith(queryNorm)) {
+                    score = 0.90f;
+                }
+            } else {
+                if (windowNorm == queryNorm) {
+                    score = 1.0f;
+                } else if (windowNorm.startsWith(queryNorm)) {
+                    score = 0.90f;
+                } else if (windowNorm.contains(queryNorm)) {
+                    score = 0.80f;
+                } else {
+                    score = calculateScore(queryNorm, windowNorm, threshold, prevRow, currRow);
+                }
+            }
+            
+            if (score >= threshold) {
+                WordBox mergedBox;
+                mergedBox.text = windowText;
+                mergedBox.normalizedText = windowNorm;
+                mergedBox.x = minX;
+                mergedBox.y = minY;
+                mergedBox.w = maxX - minX;
+                mergedBox.h = maxY - minY;
+
+                if (minHeap.size() < static_cast<size_t>(k)) {
+                    minHeap.push({mergedBox, score});
+                } else if (score > minHeap.top().score) {
+                    minHeap.pop();
+                    minHeap.push({mergedBox, score});
+                }
             }
         }
     }
@@ -107,9 +157,8 @@ std::vector<Match> FuzzySearch::topK(const QString& query, const std::vector<Wor
     std::vector<Match> results;
     results.reserve(minHeap.size());
     while (!minHeap.empty()) {
-        auto top = minHeap.top();
+        results.push_back(minHeap.top());
         minHeap.pop();
-        results.push_back({corpus[top.second], top.first});
     }
 
     // The heap pops in ascending order of score (smallest first),
