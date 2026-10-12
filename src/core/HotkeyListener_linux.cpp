@@ -72,15 +72,18 @@ private:
         }
 
         Window root = DefaultRootWindow(dpy);
-        // Resolve keycode for '9' key
-        KeyCode keycode = XKeysymToKeycode(dpy, XK_9);
+        // Resolve keycode for 'F' key
+        KeyCode keycode = XKeysymToKeycode(dpy, XK_f);
         if (keycode == 0) {
-            std::cerr << "[igi] HotkeyListener: Cannot map key '9'.\n";
+            keycode = XKeysymToKeycode(dpy, XK_F);
+        }
+        if (keycode == 0) {
+            std::cerr << "[igi] HotkeyListener: Cannot map key 'F'.\n";
             XCloseDisplay(dpy);
             return;
         }
 
-        // Grab key Ctrl+Shift+9 with lock-modifier masks (CapsLock, NumLock) to be robust
+        // Grab key Meta+Ctrl+F with lock-modifier masks (CapsLock, NumLock) to be robust
         unsigned int modifiers[] = {
             0,
             Mod2Mask,             // NumLock
@@ -88,7 +91,7 @@ private:
             Mod2Mask | LockMask
         };
 
-        const unsigned int targetMods = ControlMask | ShiftMask;
+        const unsigned int targetMods = Mod4Mask | ControlMask;
         for (unsigned int mod : modifiers) {
             XGrabKey(dpy, keycode, targetMods | mod, root, 1, GrabModeAsync, GrabModeAsync);
         }

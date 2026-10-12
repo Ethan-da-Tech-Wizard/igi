@@ -64,10 +64,13 @@ The short version (a fuller `docs/BUILDING.md` is planned):
 | OS | Dependencies | Build |
 |----|--------------|-------|
 | macOS | `brew install cmake qt tesseract leptonica pkg-config` | `cmake -B build && cmake --build build` |
-| Linux | `apt install cmake qt6-base-dev libtesseract-dev libleptonica-dev libx11-dev libgtest-dev libgmock-dev pkg-config` | `cmake -B build && cmake --build build` |
-| Windows *(untested)* | Visual Studio 2022 + vcpkg (`vcpkg install qtbase tesseract leptonica`) | `cmake --preset windows && cmake --build build` |
+| Arch Linux | `pacman -S cmake qt6-base tesseract tesseract-data-eng leptonica libx11 gtest pkgconf` | `cmake -B build && cmake --build build` |
+| Ubuntu / Debian | `apt install cmake qt6-base-dev libtesseract-dev libleptonica-dev libx11-dev libgtest-dev libgmock-dev pkg-config` | `cmake -B build && cmake --build build` |
+| Windows *(untested)* | Visual Studio 2022 + vcpkg (`vcpkg.json` manifest) | `cmake --preset windows && cmake --build build` |
 
 On a headless machine (CI, containers), set `QT_QPA_PLATFORM=offscreen` before building, because the test binary runs once during the build to discover tests. Run the suite with `ctest --test-dir build`. To skip tests and their GoogleTest dependency, configure with `-DIGI_BUILD_TESTS=OFF`.
+
+> **Note on Viewport Search:** Igi performs zero-disk visual OCR on the currently visible screen pixels of your active window. When scrolling through long web pages or multi-page documents, simply press `Ctrl+Shift+F` (or `Cmd+Shift+F` on macOS) at any scroll position to instantly capture and search the newly visible viewport.
 
 > Every platform keeps the same guarantees: 100% offline, zero disk writes,
 > volatile-RAM-only, no telemetry. If an OS can't support a capability

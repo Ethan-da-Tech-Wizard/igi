@@ -17,6 +17,8 @@
 #include <QMenu>
 #include <QAction>
 #include <QIcon>
+#include <QLocalServer>
+#include <QLocalSocket>
 
 #include "core/Daemon.h"
 #include "core/Permissions.h"
@@ -33,35 +35,16 @@ extern "C" void igi_set_activation_policy_accessory();
 #endif
 
 #ifndef Q_OS_WIN
-// ── POSIX signal → Qt event bridge (self-pipe trick) ─────────────────────────
-//
-// THREAT (T-2): If Igi is killed (SIGTERM from the OS, SIGINT from Ctrl+C, or
-// SIGQUIT from a force-quit script) while an active session holds mlock()'d
-// PHI in corpus_, the default signal handler terminates the process immediately
-// — bypassing dismiss(), skipping explicit_bzero(), and leaving zeroed-but-not-
-// yet-munlock()'d pages in RAM.
-//
-// FIX: The self-pipe trick bridges POSIX signals (which are async-signal-unsafe
-// for Qt) into Qt's event loop safely:
-//   1. A raw POSIX signal handler writes one byte to a pipe fd.
-//   2. A QSocketNotifier watches the read end of that pipe.
-//   3. When the notifier fires (on the main thread, inside the Qt event loop),
-//      it calls session->dismiss() then app.quit() — guaranteeing the corpus
-//      is zeroed and munlock()'d before the process exits.
-//
-// This pattern is recommended by the Qt documentation for POSIX signal handling.
 static int g_sigPipe[2] = {-1, -1};
 
 static void posixSignalHandler(int /*sig*/) {
-    // async-signal-safe: write() is on the POSIX safe list.
     char byte = 1;
     (void)::write(g_sigPipe[1], &byte, sizeof(byte));
 }
 
 static bool setupSignalHandler() {
     if (::pipe(g_sigPipe) != 0) {
-        qWarning() << "[igi] Failed to create signal pipe. "
-                      "SIGTERM/SIGINT will not trigger secure corpus wipe.";
+        qWarning() << "[igi] Failed to create signal pipe.";
         return false;
     }
     struct sigaction sa;
@@ -78,23 +61,41 @@ static bool setupSignalHandler() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 int main(int argc, char* argv[]) {
-    // ── SEC-GUARD: run all security checks before any PHI can enter scope ──
-    // This runs before QApplication so that NSLog output goes to Unified Log
-    // unfiltered. Hard failures abort(). Soft warnings log to MDM syslog.
     igi::core::SecurityGuard::runStartupChecks();
 
+    const QString socketName = QStringLiteral("igi_ocr_search_single_instance_socket");
+
+    // ── Single Instance Check ──
+    // Fast path: Try to connect to the socket WITHOUT creating QApplication.
+    // This prevents the application from registering with the Wayland/X11
+    // window manager (which causes taskbar flashing when the app exits).
+    {
+        int argc_copy = argc;
+        QCoreApplication coreApp(argc_copy, argv);
+        QLocalSocket clientSocket;
+        clientSocket.connectToServer(socketName);
+        if (clientSocket.waitForConnected(300)) {
+            qDebug() << "[igi] Another instance is running — sending activation signal...";
+            QByteArray token = qgetenv("XDG_ACTIVATION_TOKEN");
+            if (!token.isEmpty()) {
+                clientSocket.write("ACTIVATE:" + token + "\n");
+            } else {
+                clientSocket.write("ACTIVATE\n");
+            }
+            clientSocket.flush();
+            clientSocket.waitForBytesWritten(300);
+            clientSocket.disconnectFromServer();
+            return 0;
+        }
+    }
+
+    qDebug() << "[igi] Starting primary instance…";
     QApplication app(argc, argv);
 
-    // Suppress Dock icon — Igi runs as a background utility.
-    // The definitive suppression is LSUIElement=1 in Info.plist (Chunk 7).
 #if defined(Q_OS_MACOS)
     igi_set_activation_policy_accessory();
 #endif
 
-    qDebug() << "[igi] Starting…";
-
-    // ── Signal handling: wire SIGTERM/SIGINT/SIGQUIT → dismiss() ──────────────
-    // Must be set up before any session is created so the pipe is ready.
 #ifndef Q_OS_WIN
     const bool sigOk = setupSignalHandler();
 #else
@@ -102,11 +103,9 @@ int main(int argc, char* argv[]) {
 #endif
 
     // ── OCR engine ──
-    // Initialised once at startup and reused across all sessions.
     auto ocrEngine = std::make_unique<igi::ocr::OcrEngine>();
     if (!ocrEngine->init(nullptr, "eng")) {
-        qWarning() << "[igi] Tesseract initialisation failed. "
-                      "Ensure tessdata is installed (TESSDATA_PREFIX).";
+        qWarning() << "[igi] Tesseract initialisation failed.";
         return 1;
     }
     qDebug() << "[igi] Tesseract pre-loaded.";
@@ -121,6 +120,32 @@ int main(int argc, char* argv[]) {
     // ── Pipeline controller ──
     auto* session = new igi::SearchSession(
         capture.get(), ocrEngine.get(), overlay, flashOverlay);
+
+    // ── Setup Single Instance IPC Server ──
+    QLocalServer localServer;
+    QLocalServer::removeServer(socketName); // clean up any stale socket file
+    if (localServer.listen(socketName)) {
+        QObject::connect(&localServer, &QLocalServer::newConnection, [&localServer, session]() {
+            while (localServer.hasPendingConnections()) {
+                QLocalSocket* client = localServer.nextPendingConnection();
+                if (client) {
+                    QObject::connect(client, &QLocalSocket::readyRead, [client, session]() {
+                        QByteArray data = client->readAll();
+                        if (data.startsWith("ACTIVATE")) {
+                            qDebug() << "[igi] Activation signal received via IPC.";
+                            QList<QByteArray> parts = data.trimmed().split(':');
+                            if (parts.size() > 1 && !parts[1].isEmpty()) {
+                                qputenv("XDG_ACTIVATION_TOKEN", parts[1]);
+                                qDebug() << "[igi] Set XDG_ACTIVATION_TOKEN=" << parts[1];
+                            }
+                            session->activate();
+                        }
+                        client->deleteLater();
+                    });
+                }
+            }
+        });
+    }
 
     // ── Connect signal pipe to secure dismiss ──────────────────────────────
     // QSocketNotifier fires on the main thread (Qt event loop) when a byte
