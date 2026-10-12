@@ -7,6 +7,8 @@
 #include <QRect>
 #include <QWidget>
 
+class QLabel;
+
 #include "search/BoundingBox.h"
 
 namespace igi::ui {
@@ -49,20 +51,30 @@ public:
     // position the HighlightOverlay).
     void setHighlights(const std::vector<QRect>& rects, QRect screenRect);
 
+    // Set match summary counter (e.g., "1 of 14 (Page 42)").
+    void setMatchInfo(int matchIndex, int totalMatches, int pageNumber = 0);
+
     // Returns the current query text.
     QString query() const;
 
 signals:
     void queryChanged(const QString& text);
+    void nextMatchRequested();
+    void prevMatchRequested();
     void dismissed();
 
 protected:
+    bool event(QEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
 
 private:
-    QLineEdit*       searchField_;
+    QLineEdit*        searchField_;
+    QLabel*           matchCountLabel_;
     HighlightOverlay* highlightOverlay_ = nullptr;
+    QPoint            dragPosition_;
 };
 
 }  // namespace igi::ui

@@ -19,12 +19,13 @@ set(CMAKE_AUTOUIC ON)
 
 option(IGI_BUILD_TESTS "Build the Igi unit test suite" ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Concurrent)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Concurrent Network)
 
 if(UNIX)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(TESSERACT REQUIRED tesseract)
     pkg_check_modules(LEPTONICA REQUIRED lept)
+    pkg_check_modules(POPPLER poppler-qt6)
     if(NOT APPLE)
         find_package(X11 REQUIRED)
     endif()
@@ -35,6 +36,7 @@ if(WIN32)
     if(PKG_CONFIG_FOUND)
         pkg_check_modules(TESSERACT tesseract)
         pkg_check_modules(LEPTONICA lept)
+        pkg_check_modules(POPPLER poppler-qt6)
     endif()
     if(NOT TESSERACT_FOUND)
         find_path(TESSERACT_INCLUDE_DIRS NAMES tesseract/baseapi.h)
@@ -54,6 +56,7 @@ add_library(igi_core STATIC
     src/core/ScreenGeometry.cpp
     src/ocr/ImageConverter.cpp
     src/ocr/OcrEngine.cpp
+    src/ocr/PdfIngestor.cpp
     src/search/FuzzySearch.cpp
     src/SearchSession.cpp
     src/ui/SearchOverlay.cpp
@@ -114,14 +117,30 @@ target_include_directories(igi_core SYSTEM PUBLIC
     ${LEPTONICA_INCLUDE_DIRS}
 )
 
+if(POPPLER_FOUND)
+    target_compile_definitions(igi_core PUBLIC IGI_HAS_POPPLER=1)
+    target_include_directories(igi_core SYSTEM PUBLIC ${POPPLER_INCLUDE_DIRS})
+endif()
+
 target_link_libraries(igi_core PUBLIC
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
     Qt6::Concurrent
+    Qt6::Network
     ${TESSERACT_LIBRARIES}
     ${LEPTONICA_LIBRARIES}
 )
+
+if(POPPLER_FOUND)
+    target_link_libraries(igi_core PUBLIC ${POPPLER_LIBRARIES})
+    if(POPPLER_LIBRARY_DIRS)
+        target_link_directories(igi_core PUBLIC ${POPPLER_LIBRARY_DIRS})
+    endif()
+    message(STATUS "[igi] Built with Poppler PDF ingestion support (poppler-qt6)")
+else()
+    message(STATUS "[igi] poppler-qt6 not found — PDF ingestion disabled, using screen capture fallback")
+endif()
 
 if(TESSERACT_LIBRARY_DIRS)
     target_link_directories(igi_core PUBLIC ${TESSERACT_LIBRARY_DIRS})

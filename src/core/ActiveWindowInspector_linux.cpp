@@ -1,8 +1,11 @@
 #include "core/ActiveWindowInspector.h"
 
+#include <cmath>
 #include <QDir>
 #include <QFile>
+#include <QGuiApplication>
 #include <QRect>
+#include <QScreen>
 #include <QString>
 #include <QVariant>
 
@@ -67,8 +70,34 @@ std::optional<ActiveWindowInfo> queryActiveWindow() {
     Window child = 0;
     XTranslateCoordinates(dpy, active_win, root, 0, 0, &abs_x, &abs_y, &child);
 
+    // X11 returns physical display pixels. Convert to Qt logical desktop points.
+    double dpr = 1.0;
+    const auto screens = QGuiApplication::screens();
+    for (QScreen* s : screens) {
+        if (s) {
+            QRect physGeo(
+                static_cast<int>(std::round(s->geometry().x() * s->devicePixelRatio())),
+                static_cast<int>(std::round(s->geometry().y() * s->devicePixelRatio())),
+                static_cast<int>(std::round(s->geometry().width() * s->devicePixelRatio())),
+                static_cast<int>(std::round(s->geometry().height() * s->devicePixelRatio()))
+            );
+            if (physGeo.contains(abs_x, abs_y)) {
+                dpr = s->devicePixelRatio();
+                break;
+            }
+        }
+    }
+    if (dpr <= 0.0) {
+        dpr = QGuiApplication::primaryScreen() ? QGuiApplication::primaryScreen()->devicePixelRatio() : 1.0;
+    }
+
+    int logX = static_cast<int>(std::round(abs_x / dpr));
+    int logY = static_cast<int>(std::round(abs_y / dpr));
+    int logW = static_cast<int>(std::round(attr.width / dpr));
+    int logH = static_cast<int>(std::round(attr.height / dpr));
+
     ActiveWindowInfo info;
-    info.bounds = QRect(abs_x, abs_y, attr.width, attr.height);
+    info.bounds = QRect(logX, logY, logW, logH);
 
     // Query window process ID via _NET_WM_PID
     Atom pid_atom = XInternAtom(dpy, "_NET_WM_PID", 0);

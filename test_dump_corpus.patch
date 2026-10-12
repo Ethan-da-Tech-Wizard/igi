@@ -1,0 +1,18 @@
+--- src/SearchSession.cpp
++++ src/SearchSession.cpp
+@@ -107,6 +107,13 @@
+ 
+     // ── Fuzzy search (always on main thread, stays within 16 ms budget) ──
+     const auto matches = search::FuzzySearch::topK(query, corpus_, 50, 0.70f);
++
++    if (query == "cr") {
++        QFile f("/tmp/igi_corpus_dump.txt");
++        if (f.open(QIODevice::WriteOnly | QIODevice::Text)) {
++            QTextStream out(&f);
++            for (const auto& wb : corpus_) {
++                out << wb.text << " -> " << wb.normalizedText << "\n";
++            }
++        }
++    }
+ 
+     // Convert WordBox physical pixel rects to absolute logical screen rects.

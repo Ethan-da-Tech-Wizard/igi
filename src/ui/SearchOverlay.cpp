@@ -5,6 +5,7 @@
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QScreen>
@@ -16,7 +17,7 @@ namespace igi::ui {
 HighlightOverlay::HighlightOverlay(QRect screenRect, QWidget* parent)
     : QWidget(parent,
               Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint |
-              Qt::WindowTransparentForInput | Qt::Tool)
+              Qt::WindowTransparentForInput)
 {
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_ShowWithoutActivating);
@@ -61,9 +62,11 @@ void HighlightOverlay::paintEvent(QPaintEvent* /*event*/) {
 
 SearchOverlay::SearchOverlay(QWidget* parent)
     : QWidget(parent,
-              Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool)
+              Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint)
 {
     setAttribute(Qt::WA_TranslucentBackground);
+    // Explicitly request focus
+    setFocusPolicy(Qt::StrongFocus);
 
     // ── Layout ──
     auto* layout = new QHBoxLayout(this);
@@ -76,21 +79,27 @@ SearchOverlay::SearchOverlay(QWidget* parent)
 
     searchField_ = new QLineEdit(this);
     searchField_->setPlaceholderText("Search on screen…");
-    searchField_->setMinimumWidth(320);
+    searchField_->setMinimumWidth(400);
     searchField_->setStyleSheet(R"(
         QLineEdit {
             background: transparent;
             border: none;
             color: white;
-            font-size: 17px;
+            font-size: 22px;
             font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
-            font-weight: 300;
-            letter-spacing: 0.3px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
         }
         QLineEdit::placeholder {
-            color: rgba(255,255,255,0.35);
+            color: rgba(255, 255, 255, 0.5);
         }
     )");
+
+    matchCountLabel_ = new QLabel(this);
+    matchCountLabel_->setStyleSheet(
+        "color: #ffca28; font-size: 12px; font-weight: 500; background: rgba(255,202,40,0.15); "
+        "border: 1px solid rgba(255,202,40,0.3); border-radius: 10px; padding: 2px 8px;");
+    matchCountLabel_->hide();
 
     // Shortcut hint
     auto* hint = new QLabel("esc to close", this);
@@ -99,10 +108,11 @@ SearchOverlay::SearchOverlay(QWidget* parent)
 
     layout->addWidget(icon);
     layout->addWidget(searchField_, 1);
+    layout->addWidget(matchCountLabel_);
     layout->addWidget(hint);
 
     setFixedHeight(56);
-    setMinimumWidth(420);
+    setMinimumWidth(440);
     adjustSize();
 
     // ── Styling: dark glassmorphism pill ──
@@ -112,16 +122,14 @@ SearchOverlay::SearchOverlay(QWidget* parent)
         }
     )");
 
-    // Drop shadow on the whole pill — applied via custom paint below.
-
     connect(searchField_, &QLineEdit::textChanged,
             this, &SearchOverlay::queryChanged);
 }
 
 void SearchOverlay::activate(const QRect& targetScreen) {
-    // Centre horizontally near the top of the captured screen.
+    // Centre horizontally near the bottom of the captured screen (floating above taskbar/panel).
     const int x = targetScreen.center().x() - width() / 2;
-    const int y = targetScreen.top() + 80;
+    const int y = targetScreen.bottom() - height() - 100;
     move(x, y);
 
     show();
@@ -129,6 +137,42 @@ void SearchOverlay::activate(const QRect& targetScreen) {
     activateWindow();
     searchField_->clear();
     searchField_->setFocus();
+    if (matchCountLabel_) matchCountLabel_->hide();
+}
+
+void SearchOverlay::paintEvent(QPaintEvent*) {
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    
+    // Draw a beautiful dark glassmorphism background
+    QPainterPath path;
+    path.addRoundedRect(rect(), 16, 16);
+    
+    painter.fillPath(path, QColor(30, 30, 30, 220));
+    painter.setPen(QPen(QColor(255, 255, 255, 40), 1));
+    painter.drawPath(path);
+}
+
+void SearchOverlay::setMatchInfo(int matchIndex, int totalMatches, int pageNumber) {
+    if (!matchCountLabel_) return;
+
+    if (totalMatches <= 0 || searchField_->text().trimmed().isEmpty()) {
+        matchCountLabel_->hide();
+        return;
+    }
+
+    if (pageNumber > 0) {
+        matchCountLabel_->setText(QStringLiteral("%1 of %2 (Page %3)")
+            .arg(matchIndex + 1)
+            .arg(totalMatches)
+            .arg(pageNumber));
+    } else {
+        matchCountLabel_->setText(QStringLiteral("%1 of %2 matches")
+            .arg(matchIndex + 1)
+            .arg(totalMatches));
+    }
+    matchCountLabel_->show();
+    adjustSize();
 }
 
 void SearchOverlay::setHighlights(const std::vector<QRect>& rects, QRect screenRect) {
@@ -140,6 +184,7 @@ void SearchOverlay::setHighlights(const std::vector<QRect>& rects, QRect screenR
     highlightOverlay_->setHighlights(rects);
     if (!rects.empty()) {
         highlightOverlay_->show();
+        highlightOverlay_->raise();
     } else {
         highlightOverlay_->hide();
     }
@@ -149,37 +194,54 @@ QString SearchOverlay::query() const {
     return searchField_->text();
 }
 
+bool SearchOverlay::event(QEvent* event) {
+    if (event->type() == QEvent::WindowDeactivate) {
+        // If focus shifted to another window within our app (e.g. HighlightOverlay on Wayland), ignore it.
+        if (QApplication::activeWindow() != nullptr) {
+            return QWidget::event(event);
+        }
+        
+        // If the user clicks away or opens another window (activeWindow is null), dismiss the search bar
+        // to prevent highlights from floating over unrelated windows.
+        if (highlightOverlay_) {
+            highlightOverlay_->hide();
+        }
+        hide();
+        emit dismissed();
+    }
+    return QWidget::event(event);
+}
+
 void SearchOverlay::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_Escape) {
-        // Hide our highlight overlay too.
         if (highlightOverlay_) {
             highlightOverlay_->hide();
         }
         hide();
         emit dismissed();
         return;
+    } else if (event->key() == Qt::Key_Down || event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        emit nextMatchRequested();
+        return;
+    } else if (event->key() == Qt::Key_Up) {
+        emit prevMatchRequested();
+        return;
     }
     QWidget::keyPressEvent(event);
 }
 
-void SearchOverlay::paintEvent(QPaintEvent* /*event*/) {
-    QPainter p(this);
-    p.setRenderHint(QPainter::Antialiasing);
-
-    // Outer glow
-    {
-        const int glow = 20;
-        const QRectF glowRect = QRectF(rect()).adjusted(glow, glow, -glow, -glow);
-        QColor g(255, 255, 255, 8);
-        p.setPen(Qt::NoPen);
-        p.setBrush(g);
-        p.drawRoundedRect(QRectF(rect()), 28, 28);
+void SearchOverlay::mousePressEvent(QMouseEvent* event) {
+    if (event->button() == Qt::LeftButton) {
+        dragPosition_ = event->globalPosition().toPoint() - frameGeometry().topLeft();
+        event->accept();
     }
+}
 
-    // Dark frosted-glass pill
-    p.setPen(QPen(QColor(255, 255, 255, 30), 1));
-    p.setBrush(QColor(20, 20, 28, 210));
-    p.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 28, 28);
+void SearchOverlay::mouseMoveEvent(QMouseEvent* event) {
+    if (event->buttons() & Qt::LeftButton) {
+        move(event->globalPosition().toPoint() - dragPosition_);
+        event->accept();
+    }
 }
 
 }  // namespace igi::ui

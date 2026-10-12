@@ -9,6 +9,9 @@ add_executable(igi_smoke_test
     screen_geometry_test.cpp
     ocr_engine_test.cpp
     fuzzy_search_test.cpp
+    pdf_ingestor_test.cpp
+    screen_capture_test.cpp
+    search_session_test.cpp
 )
 
 find_package(Qt6 REQUIRED COMPONENTS Test)
