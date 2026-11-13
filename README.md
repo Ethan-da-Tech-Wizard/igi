@@ -1,19 +1,12 @@
 # Igi — Visual Search
 
-A native visual-search overlay that applies OCR and fuzzy matching to screen pixels and scanned documents.
+Igi is a desktop visual-search prototype. Its source combines screen capture, OCR, and fuzzy text matching to explore searching text shown on screen.
 
-**Status:** Desktop search prototype  
-**Built with:** C++17, Qt 6, Tesseract, Leptonica, optional Poppler
+**Status:** Prototype. Platform support, accuracy, performance, and release packaging have not been independently verified in this review. Historical project notes contain ambitious claims that require separate validation.
 
-[Project guide](docs/PROJECT_GUIDE.md) · [Every file explained](docs/FILE_GUIDE.md) · [Licenses and dependencies](docs/LICENSE_REVIEW.md)
+## Build and test
 
-## Start here
-
-- [CMakeLists.txt](CMakeLists.txt) — CMake build definition for .; declares targets, dependency discovery, and compiler/build settings.
-- [src](src) — Application source and platform integration
-- [docs/DECISIONS.md](docs/DECISIONS.md) — Documentation: Igi: Engineering Decisions Log. Covers D-001 — Fuzzy match scoring formula; D-002 — End-to-end latency SLOs; D-003 — Memory budgets.
-
-The following commands are taken from this project’s source/configuration. Install its prerequisites first.
+The CMake project uses C++17, Qt 6, Tesseract and Leptonica; Poppler is optional for PDF ingestion. Install the dependencies appropriate for your platform, then from the repository root:
 
 ```sh
 cmake -S . -B build
@@ -21,25 +14,12 @@ cmake --build build
 ctest --test-dir build
 ```
 
-[Detailed setup, usage, and development notes](PROJECT_NOTES.md) preserve the previous project documentation.
+The commands reflect the project configuration; they were not run as part of this review. Platform capture permissions and desktop integration can affect operation. Consult [PROJECT_NOTES.md](PROJECT_NOTES.md) and [engineering decisions](docs/DECISIONS.md), checking historical release, privacy and performance claims before relying on them.
 
-## Repository layout
+## Explore
 
-| Path | Role |
-| --- | --- |
-| [.github/](.github/) | GitHub workflow and contributor configuration (1 tracked entries). |
-| [assets/](assets/) | Media and visual resources used by the project (1 tracked entries). |
-| [docs/](docs/) | Project documentation, decisions, and reference material (21 tracked entries). |
-| [igi_linux_win/](igi_linux_win/) | Project-specific igi linux win components (42 tracked entries). |
-| [resources/](resources/) | Project-specific resources components (7 tracked entries). |
-| [scripts/](scripts/) | Build, launch, maintenance, and verification commands (4 tracked entries). |
-| [src/](src/) | Application source and platform integration (41 tracked entries). |
-| [tests/](tests/) | Automated checks and test fixtures (12 tracked entries). |
-
-## Scope and current limits
-
-Install the platform dependencies in README.md first. Poppler introduces GPL obligations when included in a distributed build; the project MIT license does not override that dependency.
+[Source](src/) · [Tests](tests/) · [Project guide](docs/PROJECT_GUIDE.md) · [License review](docs/LICENSE_REVIEW.md)
 
 ## License
 
-Original project code retains **MIT** terms in [LICENSE](LICENSE). Third-party libraries, media, data, models, and tools retain their own terms. See the [license review](docs/LICENSE_REVIEW.md) and [dependency inventory](docs/DEPENDENCIES.csv).
+Project code is distributed under the [MIT License](LICENSE). Tesseract, Leptonica, Qt, optional Poppler and other dependencies have separate terms. In particular, review the licensing implications of distributing Poppler with a build in the [license review](docs/LICENSE_REVIEW.md).
