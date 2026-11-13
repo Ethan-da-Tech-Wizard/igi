@@ -66,6 +66,7 @@ private:
 
     std::array<TessWorker, kOcrWorkers> workers_;
     std::atomic<int>                    nextWorker_{0};
+    std::atomic<bool>                   initialized_{false};
     QThreadPool                         workerPool_;
 
     // Recognise a horizontal strip of pix on a specific worker index.

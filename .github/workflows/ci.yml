@@ -151,7 +151,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake qt6-base-dev libtesseract-dev libleptonica-dev libx11-dev libxtst-dev libpng-dev libgl1-mesa-dev libgtest-dev libgmock-dev
+          sudo apt-get install -y cmake qt6-base-dev libtesseract-dev libleptonica-dev libx11-dev libxtst-dev libpng-dev libgl1-mesa-dev libgtest-dev libgmock-dev tesseract-ocr-eng
 
       - name: Configure
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DIGI_BUILD_TESTS=ON
