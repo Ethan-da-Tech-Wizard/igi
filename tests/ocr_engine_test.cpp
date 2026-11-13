@@ -17,6 +17,19 @@ TEST(OcrEngine, InitSucceeds) {
     EXPECT_TRUE(engine.init());
 }
 
+TEST(OcrEngine, FailedInitializationDoesNotCrashRecognition) {
+    OcrEngine engine;
+    ASSERT_FALSE(engine.init("/path/that/does/not/exist/igi-tessdata", "eng"));
+
+    QImage image(64, 64, QImage::Format_ARGB32);
+    image.fill(Qt::white);
+    PixPtr pix = ImageConverter::qImageToPix(image);
+    ASSERT_TRUE(pix != nullptr);
+    auto future = engine.recognizeAsync(std::move(pix));
+    future.waitForFinished();
+    EXPECT_TRUE(future.result().empty());
+}
+
 TEST(OcrEngine, RecognizeExtractsWordsAndRunsAsync) {
     OcrEngine engine;
     ASSERT_TRUE(engine.init());

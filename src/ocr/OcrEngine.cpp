@@ -77,6 +77,7 @@ OcrEngine::~OcrEngine() {
 }
 
 bool OcrEngine::init(const char* dataPath, const char* language) {
+    initialized_.store(false);
     const std::string path = resolveTessDataPath(dataPath);
     const char* pPath = path.empty() ? nullptr : path.c_str();
 
@@ -89,6 +90,7 @@ bool OcrEngine::init(const char* dataPath, const char* language) {
         }
         w.api->SetPageSegMode(tesseract::PSM_SPARSE_TEXT);
     }
+    initialized_.store(true);
     return true;
 }
 
@@ -105,6 +107,7 @@ std::vector<search::WordBox> OcrEngine::recognizeStrip(PIX*  strip,
 
     TessWorker& w = workers_[workerIdx];
     std::lock_guard<std::mutex> lk(w.mtx);
+    if (!initialized_.load() || !w.api) return results;
 
     w.api->SetImage(strip);
     if (w.api->Recognize(nullptr) != 0) {
