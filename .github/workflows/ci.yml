@@ -38,6 +38,8 @@ jobs:
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: cmake --build build --parallel
 
       - name: Unit tests
@@ -155,6 +157,8 @@ jobs:
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DIGI_BUILD_TESTS=ON
 
       - name: Build
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: cmake --build build --parallel
 
       - name: Unit tests
