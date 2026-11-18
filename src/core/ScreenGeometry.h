@@ -1,3 +1,8 @@
+// Program: igi - ScreenGeometry.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares DPR-aware, multi-monitor helpers that convert logical coordinates to physical pixels.
+
 #pragma once
 
 #include <QPointF>

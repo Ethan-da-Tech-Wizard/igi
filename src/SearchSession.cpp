@@ -1,3 +1,8 @@
+// Program: igi - SearchSession.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Implements SearchSession: captures the focused window, runs OCR or PDF ingestion, maps fuzzy matches to screen rectangles, and securely wipes the corpus on dismiss.
+
 #include "SearchSession.h"
 
 #ifdef Q_OS_WIN
@@ -22,6 +27,7 @@
 
 namespace igi {
 
+// Constructor: stores collaborators and connects the signals that drive the pipeline.
 SearchSession::SearchSession(
     core::IScreenCapture* capture,
     ocr::OcrEngine*       ocrEngine,
@@ -47,6 +53,7 @@ SearchSession::SearchSession(
             this, &SearchSession::dismiss);
 }
 
+// Starts a capture and OCR cycle, or toggles the overlay off if it is already open.
 void SearchSession::activate() {
     // If the overlay is already open, toggle it off!
     if (overlay_ && overlay_->isVisible()) {
@@ -66,6 +73,7 @@ void SearchSession::activate() {
     isActivating = true;
 
     // ── Debounce rapidly repeated activations (e.g. from held-down global shortcuts) ──
+    // Ignore activations that arrive within 1.5 seconds of the last one.
     static QElapsedTimer lastActivation;
     if (lastActivation.isValid() && lastActivation.elapsed() < 1500) {
         qDebug() << "[igi] Ignoring duplicate activation (debounced).";
@@ -82,6 +90,7 @@ void SearchSession::activate() {
 
     // ── 1. Capture the focused window (sync, main thread) ──
     qDebug() << "[igi] SearchSession: capturing focused window…";
+    // If capture fails, build a blank canvas the size of the primary screen so the overlay still works.
     auto captureResult = capture_->captureFocusedWindow();
     if (!captureResult) {
         qWarning() << "[igi] SearchSession: capture failed — using fallback primary screen geometry.";
@@ -130,6 +139,7 @@ void SearchSession::activate() {
         captureResult->image = std::move(dummy);
     }
 
+    // Remember the physical-pixel rectangle and derive the logical rectangle used by Qt widgets.
     capturedScreenRect_ = captureResult->screenRect;
     devicePixelRatio_ = captureResult->screen.devicePixelRatio;
     if (devicePixelRatio_ <= 0) {
@@ -146,6 +156,7 @@ void SearchSession::activate() {
     // flashOverlay_->flash(logicalScreenRect_); // Disabled: User finds it disruptive
 
     // ── 2. Check for open PDF document ──
+    // If the focused window shows a PDF file, read its text directly instead of running OCR.
     const QString& pdfPath = captureResult->activeWindow.documentPath;
     if (!pdfPath.isEmpty() && ocr::PdfIngestor::isAvailable() && QFile::exists(pdfPath)) {
         qDebug() << "[igi] SearchSession: open PDF document detected:" << pdfPath;
@@ -162,6 +173,7 @@ void SearchSession::activate() {
     }
 
     // ── 3. Fallback: Active Viewport Screen Capture + OCR ──
+    // No document available: OCR the captured pixels in the background.
     const QImage& image = captureResult->image;
 
     corpus_.clear();
@@ -184,6 +196,7 @@ void SearchSession::activate() {
     isActivating = false;
 }
 
+// Ends the session: wipes the corpus, unlocks memory and hides the overlays.
 void SearchSession::dismiss() {
     // ── Secure corpus wipe (D-006 / SEC-02) ─────────────────────────────────
     //
@@ -278,6 +291,7 @@ void SearchSession::mlockCorpus() {
     }
 }
 
+// Zeroes every corpus string, unlocks the pinned pages, then frees the vector.
 void SearchSession::munlockAndWipeCorpus() {
     // ── Step 1: explicit_bzero every QString buffer ──
     // data() forces QString copy-on-write detach so we own the buffer.
@@ -328,6 +342,7 @@ void SearchSession::munlockAndWipeCorpus() {
 
 
 
+// Slot called when background OCR completes: stores the corpus and refreshes the search.
 void SearchSession::onOcrFinished() {
     corpus_ = ocrWatcher_.result();
     qDebug() << "[igi] SearchSession: OCR complete," << corpus_.size() << "words extracted.";
@@ -341,6 +356,7 @@ void SearchSession::onOcrFinished() {
 }
 
 
+// Slot called on every keystroke: runs the fuzzy search and updates the highlights.
 void SearchSession::onQueryChanged(const QString& query) {
     if (corpus_.empty() || query.trimmed().isEmpty()) {
         // No corpus yet or empty query: clear highlights.
@@ -352,6 +368,7 @@ void SearchSession::onQueryChanged(const QString& query) {
     // ── Fuzzy search (always on main thread, stays within 16 ms budget) ──
     const auto matches = search::FuzzySearch::topK(query, corpus_, 50, 0.70f);
 
+    // Debug aid: writes the corpus text to a temporary file when the query is exactly this string.
     if (query == "cr") {
         QFile f("/tmp/igi_corpus_dump.txt");
         if (f.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -363,6 +380,7 @@ void SearchSession::onQueryChanged(const QString& query) {
     }
 
     // Convert WordBox physical pixel rects to absolute logical screen rects.
+    // Convert each match from physical pixels (relative to the capture) to logical screen coordinates.
     const QPoint origin = capturedScreenRect_.topLeft();
     std::vector<QRect> highlightRects;
     highlightRects.reserve(matches.size());

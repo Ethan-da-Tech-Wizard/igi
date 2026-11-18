@@ -1,3 +1,8 @@
+// Program: igi - PdfIngestor.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares PdfIngestor, which extracts word boxes from PDFs via Poppler with an OCR fallback.
+
 #pragma once
 
 #include <memory>

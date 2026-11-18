@@ -1,3 +1,8 @@
+// Program: igi - main.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Application entry point: starts OCR, the capture session, overlays, tray icon and hotkey daemon, and handles shutdown signals with a secure corpus wipe.
+
 #include <csignal>
 #ifndef Q_OS_WIN
 #include <unistd.h>   // pipe(), write(), read()
@@ -49,6 +54,7 @@ extern "C" void igi_set_activation_policy_accessory();
 //      is zeroed and munlock()'d before the process exits.
 //
 // This pattern is recommended by the Qt documentation for POSIX signal handling.
+// Self-pipe used to hand POSIX signals from the async handler over to the Qt event loop.
 static int g_sigPipe[2] = {-1, -1};
 
 static void posixSignalHandler(int /*sig*/) {
@@ -76,6 +82,7 @@ static bool setupSignalHandler() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Program entry: wires every component together and runs the Qt event loop.
 int main(int argc, char* argv[]) {
     // ── SEC-GUARD: run all security checks before any PHI can enter scope ──
     // This runs before QApplication so that NSLog output goes to Unified Log
@@ -102,6 +109,7 @@ int main(int argc, char* argv[]) {
 
     // ── OCR engine ──
     // Initialised once at startup and reused across all sessions.
+    // Create the OCR engine; the program cannot work without it, so exit on failure.
     auto ocrEngine = std::make_unique<igi::ocr::OcrEngine>();
     if (!ocrEngine->init(nullptr, "eng")) {
         qWarning() << "[igi] Tesseract initialisation failed. "
@@ -146,6 +154,7 @@ int main(int argc, char* argv[]) {
 #endif
 
     // ── System Tray Icon (Menu Bar) ──
+    // Tray (menu bar) icon with a small informational menu and a Quit action.
     QSystemTrayIcon trayIcon;
     // Load the .icns file from the macOS app bundle structure.
     QIcon icon(QCoreApplication::applicationDirPath() + "/../Resources/AppIcon.icns");
@@ -174,6 +183,7 @@ int main(int argc, char* argv[]) {
     trayIcon.show();
 
     // ── Daemon (hotkey + permissions) ──
+    // The daemon owns the permission check and the global hotkey.
     igi::core::Daemon daemon;
 
     // Surface missing permissions to the user.
@@ -228,6 +238,7 @@ int main(int argc, char* argv[]) {
     qDebug() << "[igi] Daemon started. Listening for Ctrl+Shift+9…";
 #endif
 
+    // Block here running the event loop until the app quits.
     int ret = app.exec();
 
     // Ensure a final secure dismiss on clean exit (user closed the app normally).

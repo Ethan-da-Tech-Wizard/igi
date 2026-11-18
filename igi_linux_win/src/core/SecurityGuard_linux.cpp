@@ -1,9 +1,15 @@
+// Program: igi - SecurityGuard_linux.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Linux SecurityGuard implementation: warns on preload environment variables and prints a disk-encryption advisory.
+
 #include "core/SecurityGuard.h"
 #include <cstdlib>
 #include <iostream>
 
 namespace igi::core {
 
+// Warns (does not abort) when library-preload environment variables are set.
 void SecurityGuard::checkDyldInjection() {
     if (std::getenv("LD_PRELOAD") != nullptr ||
         std::getenv("LD_LIBRARY_PATH") != nullptr) {
@@ -28,12 +34,14 @@ void SecurityGuard::auditAccessibilityGrants() {
     // Accessibility permissions are macOS TCC specific; stubbed.
 }
 
+// Advisory only: reminds the user to enable disk encryption.
 void SecurityGuard::checkFileVault() {
     // Advisory check for full disk encryption (LUKS / dm-crypt).
     std::cout << "[igi] SECURITY ADVISORY: Ensure LUKS / dm-crypt disk encryption is enabled "
                  "on your root partition to secure swap files containing PHI.\n";
 }
 
+// Runs each check in order and prints start and finish banners.
 void SecurityGuard::runStartupChecks() {
     std::cout << "[igi] === Security Guard: running startup checks ===\n";
     checkDyldInjection();

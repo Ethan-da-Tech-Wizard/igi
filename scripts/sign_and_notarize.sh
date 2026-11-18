@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Program: igi - sign_and_notarize.sh
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Code-signs the app bundle, either ad hoc or with a developer certificate, and optionally submits it for notarization.
+
 # scripts/sign_and_notarize.sh
 #
 # Sign Igi.app and optionally notarize it for Gatekeeper-clean distribution.
@@ -8,7 +13,7 @@
 #
 # ── CI / distribution (Developer ID cert required) ───────────────────────────
 #   export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"
-#   export APPLE_ID="you@example.com"
+#   export APPLE_ID="<your Apple ID email address>"
 #   export APPLE_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx"   # App-specific password
 #   export APPLE_TEAM_ID="YOURTEAMID"
 #   ./scripts/sign_and_notarize.sh [--notarize]

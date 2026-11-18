@@ -1,3 +1,8 @@
+// Program: igi - ocr_engine_test.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Tests OcrEngine initialisation, behaviour when uninitialised, and asynchronous recognition of rendered text.
+
 #include <gtest/gtest.h>
 
 #include <QImage>
@@ -11,12 +16,14 @@
 using namespace igi::ocr;
 using namespace igi::search;
 
+// The engine initialises with the default settings.
 TEST(OcrEngine, InitSucceeds) {
     OcrEngine engine;
     // TESSDATA_PREFIX environment variable should be set, or default Homebrew path used.
     EXPECT_TRUE(engine.init());
 }
 
+// Recognition on an uninitialised engine is safe.
 TEST(OcrEngine, FailedInitializationDoesNotCrashRecognition) {
     OcrEngine engine;
     ASSERT_FALSE(engine.init("/path/that/does/not/exist/igi-tessdata", "eng"));
@@ -30,6 +37,7 @@ TEST(OcrEngine, FailedInitializationDoesNotCrashRecognition) {
     EXPECT_TRUE(future.result().empty());
 }
 
+// Rendered text is recognised asynchronously.
 TEST(OcrEngine, RecognizeExtractsWordsAndRunsAsync) {
     OcrEngine engine;
     ASSERT_TRUE(engine.init());

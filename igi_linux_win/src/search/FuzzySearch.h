@@ -1,3 +1,8 @@
+// Program: igi - FuzzySearch.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares the Match result and FuzzySearch, which ranks corpus words against a query by edit distance.
+
 #pragma once
 
 #include <vector>

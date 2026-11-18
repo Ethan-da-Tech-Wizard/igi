@@ -1,3 +1,8 @@
+// Program: igi - image_converter_test.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Unit tests for the QImage-to-PIX converter: null input, pixel accuracy, format handling and the wiping deleter.
+
 #include <gtest/gtest.h>
 
 #include <QImage>
@@ -11,6 +16,7 @@ using igi::ocr::PixPtr;
 
 namespace {
 
+// Builds a small test image with known pixel values.
 QImage makeFixture(int w, int h) {
     QImage img(w, h, QImage::Format_ARGB32);
     for (int y = 0; y < h; ++y) {
@@ -27,10 +33,12 @@ QImage makeFixture(int w, int h) {
 
 }  // namespace
 
+// A null image gives a null PIX.
 TEST(ImageConverter, NullSourceReturnsNullPix) {
     EXPECT_EQ(ImageConverter::qImageToPix(QImage{}).get(), nullptr);
 }
 
+// Pixel values survive the conversion unchanged.
 TEST(ImageConverter, RoundTripsRGBPixelsExactly) {
     const QImage src = makeFixture(7, 5);  // odd sizes catch stride bugs
 
@@ -57,6 +65,7 @@ TEST(ImageConverter, RoundTripsRGBPixelsExactly) {
     }
 }
 
+// Images in other formats are converted correctly.
 TEST(ImageConverter, AcceptsNonARGB32Format) {
     QImage src(4, 4, QImage::Format_RGB32);
     src.fill(qRgb(50, 100, 200));
@@ -74,6 +83,7 @@ TEST(ImageConverter, AcceptsNonARGB32Format) {
     EXPECT_EQ(b, 200);
 }
 
+// Destroying a PixPtr runs the wiping deleter safely.
 TEST(ImageConverter, DeleterRunsAndDoesNotCrash) {
     // PixDeleter zeros the buffer before pixDestroy. We can't observe the
     // wipe (the buffer is freed), so this test just exercises the path

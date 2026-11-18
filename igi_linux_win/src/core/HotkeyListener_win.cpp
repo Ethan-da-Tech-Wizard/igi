@@ -1,3 +1,8 @@
+// Program: igi - HotkeyListener_win.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Windows global hotkey listener that registers a hotkey on a background thread running a message loop.
+
 #include "core/HotkeyListener.h"
 
 #define WIN32_LEAN_AND_MEAN
@@ -8,6 +13,7 @@
 
 namespace igi::core {
 
+// Registers the hotkey on a dedicated thread because Win32 hotkeys need a message loop on the registering thread.
 class WinHotkeyListener final : public IHotkeyListener {
 public:
     WinHotkeyListener() = default;
@@ -22,6 +28,7 @@ public:
         running_ = true;
         registeredSuccess_ = false;
 
+        // Start the message-loop thread, then wait until it reports success or failure.
         thread_ = std::thread(&WinHotkeyListener::runLoop, this);
 
         // Spin wait briefly for thread to register hotkey
@@ -54,6 +61,7 @@ public:
     bool isRegistered() const noexcept override { return registered_; }
 
 private:
+    // Thread body: registers the hotkey, then dispatches the callback for each hotkey message until quit.
     void runLoop() {
         threadId_ = GetCurrentThreadId();
 
@@ -87,6 +95,7 @@ private:
     bool               registered_{false};
 };
 
+// Factory: the Windows build always returns this listener.
 std::unique_ptr<IHotkeyListener> IHotkeyListener::create() {
     return std::make_unique<WinHotkeyListener>();
 }

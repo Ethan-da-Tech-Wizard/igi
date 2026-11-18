@@ -1,3 +1,8 @@
+// Program: igi - SecurityGuard.mm
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: macOS SecurityGuard implementation: library-injection, Hardened Runtime and dependency-signature checks plus advisory audits at startup.
+
 #include "core/SecurityGuard.h"
 
 #include <cstdlib>    // getenv

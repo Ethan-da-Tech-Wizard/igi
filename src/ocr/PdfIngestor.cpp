@@ -1,3 +1,8 @@
+// Program: igi - PdfIngestor.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Implements PdfIngestor: pulls word boxes from a PDF's text layer via Poppler and falls back to OCR on pages without text.
+
 #include "ocr/PdfIngestor.h"
 
 #include <QDebug>
@@ -14,6 +19,7 @@
 
 namespace igi::ocr {
 
+// Reports whether this build was compiled with Poppler support.
 bool PdfIngestor::isAvailable() {
 #if defined(IGI_HAS_POPPLER)
     return true;
@@ -22,6 +28,7 @@ bool PdfIngestor::isAvailable() {
 #endif
 }
 
+// Reads every page: uses embedded text when present, otherwise renders and OCRs the page.
 std::vector<search::WordBox> PdfIngestor::ingestPdf(const QString& pdfPath, OcrEngine* ocrEngine) {
     std::vector<search::WordBox> results;
 
@@ -44,6 +51,7 @@ std::vector<search::WordBox> PdfIngestor::ingestPdf(const QString& pdfPath, OcrE
         std::unique_ptr<Poppler::Page> page(doc->page(i));
         if (!page) continue;
 
+        // Pages are numbered from 1 for display.
         const int pageNumber = i + 1; // 1-based page index
         auto textList = page->textList();
 
@@ -69,6 +77,7 @@ std::vector<search::WordBox> PdfIngestor::ingestPdf(const QString& pdfPath, OcrE
             }
         } else if (ocrEngine) {
             // Scanned image page: render to QImage at 150 DPI and OCR
+            // Render the scanned page to an image at 150 DPI before OCR.
             QImage img = page->renderToImage(150.0, 150.0);
             if (!img.isNull()) {
                 if (img.format() != QImage::Format_ARGB32) {

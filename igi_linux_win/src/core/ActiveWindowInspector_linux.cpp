@@ -1,3 +1,8 @@
+// Program: igi - ActiveWindowInspector_linux.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Linux (X11) implementation of queryActiveWindow: finds the active window and returns its bounds, process id, names and any open PDF file.
+
 #include "core/ActiveWindowInspector.h"
 
 #include <QDir>
@@ -19,6 +24,7 @@
 
 namespace igi::core {
 
+// Returns details of the active X11 window, or nullopt when none can be found.
 std::optional<ActiveWindowInfo> queryActiveWindow() {
     Display* dpy = XOpenDisplay(nullptr);
     if (!dpy) {

@@ -1,3 +1,8 @@
+// Program: igi - CaptureFlashOverlay.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares CaptureFlashOverlay, a click-through widget that briefly flashes an amber frame over the captured area.
+
 #pragma once
 
 #include <QWidget>

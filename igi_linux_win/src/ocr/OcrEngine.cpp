@@ -1,3 +1,8 @@
+// Program: igi - OcrEngine.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Implements OcrEngine: initialises four Tesseract workers and runs OCR on horizontal image strips in parallel, merging results in reading order.
+
 #include "ocr/OcrEngine.h"
 
 #include <algorithm>
@@ -61,6 +66,7 @@ std::string OcrEngine::resolveTessDataPath(const char* callerPath) {
 // Lifecycle
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Constructor: limits the thread pool to one thread per Tesseract worker.
 OcrEngine::OcrEngine() {
     // N=4 threads: one per TessWorker. Each thread runs exclusively on its
     // assigned worker slot (dispatch is round-robin via nextWorker_), so no
@@ -68,6 +74,7 @@ OcrEngine::OcrEngine() {
     workerPool_.setMaxThreadCount(kOcrWorkers);
 }
 
+// Destructor: waits for running OCR jobs, then shuts down each Tesseract instance.
 OcrEngine::~OcrEngine() {
     workerPool_.waitForDone();
     for (auto& w : workers_) {
@@ -76,6 +83,7 @@ OcrEngine::~OcrEngine() {
     }
 }
 
+// Creates and initialises every worker; returns false if any Tesseract init fails.
 bool OcrEngine::init(const char* dataPath, const char* language) {
     const std::string path = resolveTessDataPath(dataPath);
     const char* pPath = path.empty() ? nullptr : path.c_str();
@@ -96,6 +104,7 @@ bool OcrEngine::init(const char* dataPath, const char* language) {
 // Strip recognition (runs on a worker thread)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Runs Tesseract on one strip and returns word boxes with Y shifted back to full-image coordinates.
 std::vector<search::WordBox> OcrEngine::recognizeStrip(PIX*  strip,
                                                         int   yOffset,
                                                         int   pageIndex,
@@ -145,6 +154,7 @@ std::vector<search::WordBox> OcrEngine::recognizeStrip(PIX*  strip,
 // ─────────────────────────────────────────────────────────────────────────────
 
 QFuture<std::vector<search::WordBox>>
+// Starts OCR in the background: splits the image into strips, runs them in parallel and merges the words.
 OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
     // The outer future runs on one thread from workerPool_ and fans out to
     // N concurrent sub-futures (one per horizontal strip), then merges.

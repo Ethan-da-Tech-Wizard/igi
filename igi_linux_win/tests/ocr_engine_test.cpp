@@ -1,3 +1,8 @@
+// Program: igi - ocr_engine_test.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Tests OcrEngine initialisation and asynchronous recognition of rendered text.
+
 #include <gtest/gtest.h>
 
 #include <QImage>

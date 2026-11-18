@@ -1,3 +1,8 @@
+// Program: igi - OcrEngine.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares OcrEngine, a pool of four Tesseract workers that recognise image strips in parallel.
+
 #pragma once
 
 #include <array>

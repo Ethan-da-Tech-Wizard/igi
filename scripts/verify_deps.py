@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# Program: igi - verify_deps.py
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Python version of the dependency integrity check: compares installed package versions and library SHA-256 hashes with the lockfile.
+
 """
 scripts/verify_deps.sh — Dependency integrity check (Python 3, no bash 4 required).
 
@@ -27,6 +32,7 @@ PACKAGES = ["tesseract", "leptonica", "qt"]
 
 
 def brew_prefix(pkg: str) -> str:
+    """Return Homebrew's install prefix for a package, or an empty string on failure."""
     try:
         r = subprocess.run(["brew", "--prefix", pkg],
                            capture_output=True, text=True, timeout=15)
@@ -36,6 +42,7 @@ def brew_prefix(pkg: str) -> str:
 
 
 def brew_version(pkg: str) -> str:
+    """Return the installed Homebrew version of a package, or NOT_INSTALLED if it cannot be found."""
     try:
         r = subprocess.run(["brew", "list", "--versions", pkg],
                            capture_output=True, text=True, timeout=15)
@@ -48,6 +55,7 @@ def brew_version(pkg: str) -> str:
 
 
 def sha256_file(path: pathlib.Path) -> str:
+    """Return the SHA-256 hex digest of a file, read in chunks."""
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
@@ -56,6 +64,7 @@ def sha256_file(path: pathlib.Path) -> str:
 
 
 def find_dylib(prefix: str, pkg: str) -> pathlib.Path | None:
+    """Locate the package's main dynamic library under the prefix, preferring a real file over a symlink."""
     lib_dir = pathlib.Path(prefix) / "lib"
     if not lib_dir.is_dir():
         return None
@@ -69,6 +78,7 @@ def find_dylib(prefix: str, pkg: str) -> pathlib.Path | None:
 
 
 def collect() -> dict:
+    """Gather version, library path and hash for every tracked package."""
     result = {}
     for pkg in PACKAGES:
         version = brew_version(pkg)
@@ -81,6 +91,7 @@ def collect() -> dict:
 
 
 def load_lock() -> dict:
+    """Read the lockfile into a dict of package to version and hash; empty if the file is missing."""
     if not LOCK_FILE.exists():
         return {}
     data = {}
@@ -95,6 +106,7 @@ def load_lock() -> dict:
 
 
 def save_lock(state: dict) -> None:
+    """Write the given state to the lockfile and print it."""
     lines = [
         "# Igi dependency lockfile",
         f"# Generated: {datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')}",
@@ -111,6 +123,7 @@ def save_lock(state: dict) -> None:
 
 
 def main() -> int:
+    """Compare installed packages with the lockfile, or rewrite it when --update is given; returns an exit code."""
     update_mode = "--update" in sys.argv
 
     print("==> Collecting installed dependency state…")

@@ -1,3 +1,8 @@
+// Program: igi - test_cr.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Manual check that FuzzySearch matches short prefix queries against a single-word corpus.
+
 #include <QString>
 #include <QDebug>
 #include <iostream>

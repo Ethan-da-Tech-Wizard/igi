@@ -1,3 +1,8 @@
+// Program: igi - FuzzySearch.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Implements text normalisation, a bounded Levenshtein score and top-K multi-word fuzzy matching.
+
 #include "search/FuzzySearch.h"
 
 #include <algorithm>
@@ -7,6 +12,7 @@
 
 namespace igi::search {
 
+// Keeps only letters and digits and lowercases them.
 QString FuzzySearch::normalize(const QString& text) {
     QString result;
     result.reserve(text.length());
@@ -20,6 +26,7 @@ QString FuzzySearch::normalize(const QString& text) {
     return result;
 }
 
+// Returns 1 minus edit distance over the longer length; returns 0 early if the threshold cannot be met.
 float FuzzySearch::calculateScore(const QString& queryNorm, const QString& candidateNorm, float threshold, std::vector<int>& prevRow, std::vector<int>& currRow) {
     const int len1 = queryNorm.length();
     const int len2 = candidateNorm.length();
@@ -73,6 +80,7 @@ float FuzzySearch::calculateScore(const QString& queryNorm, const QString& candi
     return score;
 }
 
+// Scores every window of consecutive words against the query and keeps the best k in a min-heap.
 std::vector<Match> FuzzySearch::topK(const QString& query, const std::vector<WordBox>& corpus, int k, float threshold) {
     QString queryNorm = normalize(query);
     if (queryNorm.isEmpty() || corpus.empty() || k <= 0) {
@@ -97,6 +105,7 @@ std::vector<Match> FuzzySearch::topK(const QString& query, const std::vector<Wor
         int maxX = corpus[i].x + corpus[i].w;
         int maxY = corpus[i].y + corpus[i].h;
         
+        // A multi-word query is compared against windows of the same number of corpus words.
         int estimatedWords = query.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts).size();
         if (estimatedWords == 0) estimatedWords = 1;
         
@@ -117,6 +126,7 @@ std::vector<Match> FuzzySearch::topK(const QString& query, const std::vector<Wor
 
             // Prevent visual overload for very short queries (1-2 characters)
             // by restricting matches to exact or prefix only.
+            // Fixed scores: exact 1.0, prefix 0.90, substring 0.80, otherwise edit-distance score.
             if (queryNorm.length() <= 2) {
                 if (windowNorm == queryNorm) {
                     score = 1.0f;
@@ -136,6 +146,7 @@ std::vector<Match> FuzzySearch::topK(const QString& query, const std::vector<Wor
             }
             
             if (score >= threshold) {
+                // Merge the window's words into one box that spans all of them.
                 WordBox mergedBox;
                 mergedBox.text = windowText;
                 mergedBox.normalizedText = windowNorm;
@@ -163,6 +174,7 @@ std::vector<Match> FuzzySearch::topK(const QString& query, const std::vector<Wor
 
     // The heap pops in ascending order of score (smallest first),
     // but we want the final results in descending order (best first).
+    // Reverse so the best match comes first.
     std::reverse(results.begin(), results.end());
 
     return results;

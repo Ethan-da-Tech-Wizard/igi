@@ -1,3 +1,8 @@
+// Program: igi - SearchOverlay.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Implements the transparent match-highlight window and the floating search bar with its painting and Escape handling.
+
 #include "ui/SearchOverlay.h"
 
 #include <QApplication>
@@ -13,6 +18,7 @@ namespace igi::ui {
 
 // ─── HighlightOverlay ────────────────────────────────────────────────────────
 
+// Click-through, transparent window sized to the captured area.
 HighlightOverlay::HighlightOverlay(QRect screenRect, QWidget* parent)
     : QWidget(parent,
               Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint |
@@ -23,11 +29,13 @@ HighlightOverlay::HighlightOverlay(QRect screenRect, QWidget* parent)
     setGeometry(screenRect);
 }
 
+// Stores the rectangles and schedules a repaint.
 void HighlightOverlay::setHighlights(const std::vector<QRect>& rects) {
     highlights_ = rects;
     update();
 }
 
+// Draws the highlight rectangles.
 void HighlightOverlay::paintEvent(QPaintEvent* /*event*/) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
@@ -59,6 +67,7 @@ void HighlightOverlay::paintEvent(QPaintEvent* /*event*/) {
 
 // ─── SearchOverlay ───────────────────────────────────────────────────────────
 
+// Builds the search bar and connects text changes to queryChanged.
 SearchOverlay::SearchOverlay(QWidget* parent)
     : QWidget(parent,
               Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool)
@@ -118,6 +127,7 @@ SearchOverlay::SearchOverlay(QWidget* parent)
             this, &SearchOverlay::queryChanged);
 }
 
+// Shows the bar, focused and with an empty field.
 void SearchOverlay::activate(const QRect& targetScreen) {
     // Centre horizontally near the top of the captured screen.
     const int x = targetScreen.center().x() - width() / 2;
@@ -131,6 +141,7 @@ void SearchOverlay::activate(const QRect& targetScreen) {
     searchField_->setFocus();
 }
 
+// Creates or repositions the highlight window and shows it only when there are matches.
 void SearchOverlay::setHighlights(const std::vector<QRect>& rects, QRect screenRect) {
     if (!highlightOverlay_) {
         highlightOverlay_ = new HighlightOverlay(screenRect);
@@ -145,10 +156,12 @@ void SearchOverlay::setHighlights(const std::vector<QRect>& rects, QRect screenR
     }
 }
 
+// Returns the current text in the search field.
 QString SearchOverlay::query() const {
     return searchField_->text();
 }
 
+// Escape closes the bar and emits dismissed; other keys go to the text field.
 void SearchOverlay::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_Escape) {
         // Hide our highlight overlay too.
@@ -162,6 +175,7 @@ void SearchOverlay::keyPressEvent(QKeyEvent* event) {
     QWidget::keyPressEvent(event);
 }
 
+// Paints the rounded dark background.
 void SearchOverlay::paintEvent(QPaintEvent* /*event*/) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);

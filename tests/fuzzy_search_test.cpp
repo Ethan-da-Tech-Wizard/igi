@@ -1,3 +1,8 @@
+// Program: igi - fuzzy_search_test.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Unit tests and a timing check for FuzzySearch normalisation, scoring and top-K ranking.
+
 #include <gtest/gtest.h>
 
 #include <vector>
@@ -10,12 +15,14 @@
 
 using namespace igi::search;
 
+// normalize removes punctuation and lowercases.
 TEST(FuzzySearch, NormalizeStripsPunctuationAndLowercases) {
     EXPECT_EQ(FuzzySearch::normalize("Hello, World!"), "helloworld");
     EXPECT_EQ(FuzzySearch::normalize("Igi-Search"), "igisearch");
     EXPECT_EQ(FuzzySearch::normalize("PATIENT:"), "patient");
 }
 
+// Checks calculateScore against a table of input pairs and expected scores.
 TEST(FuzzySearch, CalculateScoreTableDriven) {
     // "Igl" vs "Igi" -> max(3, 3) = 3, dist = 1, score = 1 - 1/3 = 0.666
     // Wait, D-001 says ("Igl", "Igi") -> score >= 0.85? 
@@ -37,6 +44,7 @@ TEST(FuzzySearch, CalculateScoreTableDriven) {
     EXPECT_LT(score2, 0.85f); 
 }
 
+// topK returns the right matches, best first.
 TEST(FuzzySearch, TopKFindsMatchesAndSortsCorrectly) {
     std::vector<WordBox> corpus = {
         {"patient", "patient", 0, 0, 10, 10, 99.0f, 0},
@@ -58,6 +66,7 @@ TEST(FuzzySearch, TopKFindsMatchesAndSortsCorrectly) {
     EXPECT_NEAR(matches[1].score, 0.857f, 0.01f);
 }
 
+// Times topK on a larger corpus.
 TEST(FuzzySearch, MicrobenchmarkTopK) {
     // Generate 5000 random words
     std::vector<WordBox> corpus;

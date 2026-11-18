@@ -1,3 +1,8 @@
+// Program: igi - Permissions.mm
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: macOS implementation that checks Screen Recording and Accessibility permissions, requests them, and opens the matching Settings panes.
+
 #include "core/Permissions.h"
 
 #import <AppKit/AppKit.h>
@@ -5,6 +10,7 @@
 
 namespace igi::core {
 
+// Checks both permissions and triggers the system request when one is missing so the app appears in Settings.
 PermissionStatus preflightPermissions() {
     PermissionStatus status;
 
@@ -29,6 +35,7 @@ PermissionStatus preflightPermissions() {
     return status;
 }
 
+// Opens the Screen Recording privacy pane.
 void openScreenRecordingSettings() {
     [[NSWorkspace sharedWorkspace] openURL:
         [NSURL URLWithString:
@@ -36,6 +43,7 @@ void openScreenRecordingSettings() {
              "?Privacy_ScreenCapture"]];
 }
 
+// Opens the Accessibility privacy pane.
 void openAccessibilitySettings() {
     [[NSWorkspace sharedWorkspace] openURL:
         [NSURL URLWithString:

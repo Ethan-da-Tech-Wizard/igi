@@ -1,3 +1,8 @@
+// Program: igi - screen_geometry_test.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Tests ScreenGeometry screen lookup and logical-to-physical coordinate scaling against the available displays.
+
 #include <gtest/gtest.h>
 
 #include <QGuiApplication>
@@ -12,6 +17,7 @@ using igi::core::ScreenInfo;
 // macos-14 GitHub runners present a single virtual display; we assert
 // only the invariants that hold for any non-empty screen list.
 
+// A point off every screen resolves to the primary screen.
 TEST(ScreenGeometry, ReturnsValidPrimaryWhenAtPointOutsideAllScreens) {
     if (QGuiApplication::screens().isEmpty()) {
         GTEST_SKIP() << "no screens connected";
@@ -25,6 +31,7 @@ TEST(ScreenGeometry, ReturnsValidPrimaryWhenAtPointOutsideAllScreens) {
     EXPECT_FALSE(info.virtualGeometry.isEmpty());
 }
 
+// A point inside a screen resolves to that screen.
 TEST(ScreenGeometry, ReturnsCorrectScreenForPointInsideIt) {
     const auto screens = QGuiApplication::screens();
     if (screens.isEmpty()) {
@@ -40,6 +47,7 @@ TEST(ScreenGeometry, ReturnsCorrectScreenForPointInsideIt) {
     }
 }
 
+// An out-of-range index resolves to the primary screen.
 TEST(ScreenGeometry, ScreenByIndexClampsOutOfRangeToPrimary) {
     if (QGuiApplication::screens().isEmpty()) {
         GTEST_SKIP() << "no screens connected";
@@ -50,6 +58,7 @@ TEST(ScreenGeometry, ScreenByIndexClampsOutOfRangeToPrimary) {
     EXPECT_GT(info.devicePixelRatio, 0.0);
 }
 
+// A point is scaled by the device pixel ratio.
 TEST(ScreenGeometry, PointToScreenPixelsScalesByDPR) {
     if (QGuiApplication::screens().isEmpty()) {
         GTEST_SKIP() << "no screens connected";
@@ -64,6 +73,7 @@ TEST(ScreenGeometry, PointToScreenPixelsScalesByDPR) {
     EXPECT_DOUBLE_EQ(px.y(), logical.y() * dpr);
 }
 
+// Every rectangle value is scaled by the ratio.
 TEST(ScreenGeometry, RectToScreenPixelsScalesAllCorners) {
     if (QGuiApplication::screens().isEmpty()) {
         GTEST_SKIP() << "no screens connected";
@@ -80,6 +90,7 @@ TEST(ScreenGeometry, RectToScreenPixelsScalesAllCorners) {
     EXPECT_DOUBLE_EQ(px.height(),  logical.height() * dpr);
 }
 
+// Combines a window origin with a word offset at a pixel ratio of 2 and checks the result.
 TEST(ScreenGeometry, CoordinateScalingInvariance) {
     const qreal dpr = 2.0;
     const QRect logicalWindow(100, 200, 800, 600);

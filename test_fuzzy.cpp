@@ -1,3 +1,8 @@
+// Program: igi - test_fuzzy.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Manual check that FuzzySearch finds an exact normalised-text match.
+
 #include "search/FuzzySearch.h"
 #include <QString>
 #include <QDebug>

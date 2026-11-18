@@ -1,3 +1,8 @@
+// Program: igi - ScreenCapture.mm
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: macOS screen capture that finds the focused window's CoreGraphics window id and renders it into a QImage.
+
 #include "core/ScreenCapture.h"
 
 #include "core/ActiveWindowInspector.h"
@@ -21,6 +26,7 @@ namespace {
 // virtual desktop with the top-left of the primary display at (0,0),
 // so they should agree directly. We still match by PID + intersection
 // to be robust against off-by-one position differences.
+// Picks the on-screen window of the same process with the largest overlap with the given bounds.
 CGWindowID findCgWindowFor(const ActiveWindowInfo& info) {
     CFArrayRef windows = CGWindowListCopyWindowInfo(
         kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements,
@@ -69,6 +75,7 @@ CGWindowID findCgWindowFor(const ActiveWindowInfo& info) {
     return best;
 }
 
+// Draws a CGImage into a new ARGB32 QImage.
 QImage cgImageToQImage(CGImageRef cgImage) {
     const size_t w = CGImageGetWidth(cgImage);
     const size_t h = CGImageGetHeight(cgImage);
@@ -92,6 +99,7 @@ QImage cgImageToQImage(CGImageRef cgImage) {
     return out;
 }
 
+// Captures the focused window's pixels through CoreGraphics.
 class CGScreenCapture final : public IScreenCapture {
 public:
     std::optional<CaptureResult> captureFocusedWindow() override {
@@ -132,6 +140,7 @@ public:
 
 }  // namespace
 
+// Factory returning the CoreGraphics implementation.
 std::unique_ptr<IScreenCapture> IScreenCapture::create() {
     return std::make_unique<CGScreenCapture>();
 }

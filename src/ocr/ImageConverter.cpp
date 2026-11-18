@@ -1,3 +1,8 @@
+// Program: igi - ImageConverter.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Converts a QImage into a Leptonica PIX while pinning buffers in RAM and wiping pixel memory on destruction.
+
 #include "ocr/ImageConverter.h"
 
 #include <cstddef>
@@ -53,12 +58,14 @@ void PixDeleter::operator()(Pix* p) const noexcept {
 //   If mlock() fails (RLIMIT_MEMLOCK exhausted), we log a warning and
 //   continue — igi_bzero on the PIX output is still the primary wipe control.
 
+// Returns nullptr for a null or empty image; otherwise a new 32-bit PIX owned by the caller.
 PixPtr ImageConverter::qImageToPix(const QImage& source) {
     if (source.isNull() || source.width() <= 0 || source.height() <= 0) {
         return PixPtr{};
     }
 
     // Normalise to ARGB32: guaranteed contiguous, 4 bytes/pixel, no padding.
+    // Convert to a known 32-bit layout so the copy loop can read rows directly.
     const QImage rgb = (source.format() == QImage::Format_ARGB32)
         ? source
         : source.convertToFormat(QImage::Format_ARGB32);
@@ -88,6 +95,7 @@ PixPtr ImageConverter::qImageToPix(const QImage& source) {
     }
 
     // ── Allocate output PIX ───────────────────────────────────────────────────
+    // Create the destination image of the same size.
     Pix* pix = pixCreate(w, h, 32);
     if (!pix) {
 #ifndef Q_OS_WIN

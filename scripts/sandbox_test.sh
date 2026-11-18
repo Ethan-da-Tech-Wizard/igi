@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Program: igi - sandbox_test.sh
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Runs the app under a write-denying macOS sandbox profile to check it performs no filesystem writes during startup and shutdown.
+
 # scripts/sandbox_test.sh
 #
 # D-007 write-deny sandbox test (DECISIONS.md D-007).

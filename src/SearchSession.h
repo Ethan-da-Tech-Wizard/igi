@@ -1,3 +1,8 @@
+// Program: igi - SearchSession.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares SearchSession, which orchestrates one capture, OCR and fuzzy-search interaction and holds the in-memory text corpus.
+
 #pragma once
 
 #include <memory>

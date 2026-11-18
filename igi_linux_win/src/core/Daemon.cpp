@@ -1,9 +1,15 @@
+// Program: igi - Daemon.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Implements Daemon start/stop, permission preflight reporting and global hotkey registration.
+
 #include "core/Daemon.h"
 
 #include <QDebug>
 
 namespace igi::core {
 
+// Uses the supplied listener, or creates the platform default when none is given.
 Daemon::Daemon(std::unique_ptr<IHotkeyListener> listener, QObject* parent)
     : QObject(parent)
     , listener_(listener ? std::move(listener) : IHotkeyListener::create())
@@ -19,10 +25,12 @@ Daemon::~Daemon() {
     }
 }
 
+// Returns the daemon's version string.
 QString Daemon::version() const {
     return QStringLiteral("0.1.0-chunk1");
 }
 
+// Starts the daemon once: checks permissions, registers the hotkey and emits started().
 void Daemon::start() {
     if (running_) {
         return;
@@ -32,6 +40,7 @@ void Daemon::start() {
     emit started();
 }
 
+// Releases the hotkey and emits stopped(); does nothing if not running.
 void Daemon::stop() {
     if (!running_) {
         return;
@@ -43,6 +52,7 @@ void Daemon::stop() {
     emit stopped();
 }
 
+// Reads permission state, warns about gaps, reports them and then registers the hotkey.
 void Daemon::checkAndWirePermissions() {
     permissions_ = preflightPermissions();
 
