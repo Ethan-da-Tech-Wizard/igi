@@ -1,3 +1,8 @@
+// Program: igi - HotkeyListener.mm
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: macOS global hotkey listeners: an NSEvent-monitor version and a Carbon version (the one the factory returns).
+
 #include "core/HotkeyListener.h"
 
 #import <AppKit/AppKit.h>
@@ -8,6 +13,7 @@ namespace igi::core {
 // ---------------------------------------------------------------------------
 // NSEventHotkeyListener — primary path (requires Accessibility entitlement)
 // ---------------------------------------------------------------------------
+// Uses NSEvent monitors: a global one for other apps and a local one for this app.
 class NSEventHotkeyListener final : public IHotkeyListener {
 public:
     ~NSEventHotkeyListener() override { unregisterHotkey(); }
@@ -75,6 +81,7 @@ private:
 // CarbonHotkeyListener — compiled fallback (see DECISIONS.md D-004)
 // Activate by changing IHotkeyListener::create() to return this type.
 // ---------------------------------------------------------------------------
+// Uses the Carbon hotkey API, which needs no Accessibility permission.
 class CarbonHotkeyListener final : public IHotkeyListener {
 public:
     ~CarbonHotkeyListener() override { unregisterHotkey(); }
@@ -133,6 +140,7 @@ private:
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
+// The Carbon listener is the one returned here.
 std::unique_ptr<IHotkeyListener> IHotkeyListener::create() {
     return std::make_unique<CarbonHotkeyListener>();
 }

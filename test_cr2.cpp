@@ -1,3 +1,8 @@
+// Program: igi - test_cr2.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Variant of the prefix-query check using a longer corpus word.
+
 #include <QString>
 #include <QDebug>
 #include <iostream>

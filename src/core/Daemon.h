@@ -1,3 +1,8 @@
+// Program: igi - Daemon.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares Daemon, which checks OS permissions and registers the global hotkey, signalling when it fires.
+
 #pragma once
 
 #include <memory>

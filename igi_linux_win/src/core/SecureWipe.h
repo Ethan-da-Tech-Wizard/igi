@@ -1,3 +1,8 @@
+// Program: igi - SecureWipe.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Provides igi_bzero, a memory wipe that the compiler cannot optimise away, for sensitive buffers.
+
 #pragma once
 
 #include <cstddef>   // size_t

@@ -1,3 +1,8 @@
+// Program: igi - ImageConverter.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares the Leptonica PIX smart pointer with a wiping deleter and the QImage-to-PIX converter.
+
 #pragma once
 
 #include <memory>

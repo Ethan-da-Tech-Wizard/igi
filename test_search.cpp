@@ -1,3 +1,8 @@
+// Program: igi - test_search.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Manual check of FuzzySearch match counts for increasingly long prefixes of one word.
+
 #include <QString>
 #include <QDebug>
 #include <iostream>

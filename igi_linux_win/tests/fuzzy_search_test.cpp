@@ -1,3 +1,8 @@
+// Program: igi - fuzzy_search_test.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Unit tests for FuzzySearch normalisation, scoring and top-K ranking.
+
 #include <gtest/gtest.h>
 
 #include <vector>

@@ -1,3 +1,8 @@
+// Program: igi - Permissions.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares the permission status struct and helpers for checking and opening OS permission settings.
+
 #pragma once
 
 namespace igi::core {

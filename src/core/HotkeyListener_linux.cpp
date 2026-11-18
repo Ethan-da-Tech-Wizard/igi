@@ -1,3 +1,8 @@
+// Program: igi - HotkeyListener_linux.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Linux (X11) global hotkey listener that grabs the key combination and watches for it on a background thread.
+
 #include "core/HotkeyListener.h"
 
 #include <thread>
@@ -19,11 +24,13 @@
 
 namespace igi::core {
 
+// Grabs the key on the X root window and polls for events on a worker thread.
 class X11HotkeyListener final : public IHotkeyListener {
 public:
     X11HotkeyListener() = default;
     ~X11HotkeyListener() override { unregisterHotkey(); }
 
+    // Starts the listener thread; the pipe lets unregisterHotkey wake the thread to stop it.
     bool registerHotkey(Callback callback) override {
         if (registered_) {
             return true;
@@ -42,6 +49,7 @@ public:
         return true;
     }
 
+    // Signals the thread through the pipe, joins it and closes the pipe.
     void unregisterHotkey() override {
         if (!registered_) {
             return;
@@ -64,6 +72,7 @@ public:
     bool isRegistered() const noexcept override { return registered_; }
 
 private:
+    // Thread body: opens the display, grabs the key (with lock-key variants) and dispatches matching key presses.
     void runLoop() {
         Display* dpy = XOpenDisplay(nullptr);
         if (!dpy) {
@@ -96,6 +105,7 @@ private:
             XGrabKey(dpy, keycode, targetMods | mod, root, 1, GrabModeAsync, GrabModeAsync);
         }
 
+        // Wait on both the X connection and the wake-up pipe.
         int x11Fd = ConnectionNumber(dpy);
         struct pollfd fds[2];
         fds[0].fd = x11Fd;
@@ -145,6 +155,7 @@ private:
     int               pipeFds_[2] = {-1, -1};
 };
 
+// Factory: the Linux build returns the X11 listener.
 std::unique_ptr<IHotkeyListener> IHotkeyListener::create() {
     return std::make_unique<X11HotkeyListener>();
 }

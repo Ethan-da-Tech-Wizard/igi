@@ -1,3 +1,8 @@
+# Program: igi - test_tess.py
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Manual script that draws text on an image and prints the text pytesseract reads from it.
+
 from PIL import Image, ImageDraw, ImageFont
 import pytesseract
 import sys

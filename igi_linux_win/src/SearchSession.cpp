@@ -1,3 +1,8 @@
+// Program: igi - SearchSession.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Implements SearchSession: captures the focused window, runs background OCR, maps fuzzy matches to screen rectangles, and securely wipes the corpus on dismiss.
+
 #include "SearchSession.h"
 
 #ifdef Q_OS_WIN
@@ -42,6 +47,7 @@ SearchSession::SearchSession(
             this, &SearchSession::dismiss);
 }
 
+// Starts a capture and background OCR cycle.
 void SearchSession::activate() {
     // ── 1. Capture the focused window (sync, main thread) ──
     qDebug() << "[igi] SearchSession: capturing focused window…";
@@ -130,6 +136,7 @@ void SearchSession::activate() {
     overlay_->activate(logicalScreenRect_);
 }
 
+// Ends the session: wipes the corpus, unlocks memory and hides the overlays.
 void SearchSession::dismiss() {
     // ── Secure corpus wipe (D-006 / SEC-02) ─────────────────────────────────
     //
@@ -218,6 +225,7 @@ void SearchSession::mlockCorpus() {
     }
 }
 
+// Zeroes every corpus string, unlocks the pinned pages, then frees the vector.
 void SearchSession::munlockAndWipeCorpus() {
     // ── Step 1: explicit_bzero every QString buffer ──
     // data() forces QString copy-on-write detach so we own the buffer.
@@ -268,6 +276,7 @@ void SearchSession::munlockAndWipeCorpus() {
 
 
 
+// Slot called when background OCR completes: stores the corpus and refreshes the search.
 void SearchSession::onOcrFinished() {
     corpus_ = ocrWatcher_.result();
     qDebug() << "[igi] SearchSession: OCR complete," << corpus_.size() << "words extracted.";
@@ -281,6 +290,7 @@ void SearchSession::onOcrFinished() {
 }
 
 
+// Slot called on every keystroke: runs the fuzzy search and updates the highlights.
 void SearchSession::onQueryChanged(const QString& query) {
     if (corpus_.empty() || query.trimmed().isEmpty()) {
         // No corpus yet or empty query: clear highlights.

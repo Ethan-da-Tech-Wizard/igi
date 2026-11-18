@@ -1,3 +1,8 @@
+// Program: igi - ActiveWindowInspector.mm
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: macOS implementation of queryActiveWindow using the Accessibility API to read the focused window's bounds and document.
+
 #include "core/ActiveWindowInspector.h"
 
 #include <QRect>
@@ -16,12 +21,14 @@ namespace {
 // through to "no active window" and skip the session.
 constexpr float kAxTimeoutSeconds = 0.25f;
 
+// Converts a CoreFoundation string to a QString.
 QString cfStringToQString(CFStringRef ref) {
     if (!ref) return {};
     NSString* s = (__bridge NSString*)ref;
     return QString::fromNSString(s);
 }
 
+// Reads a string attribute from an Accessibility element; returns false if missing or not a string.
 bool copyAxString(AXUIElementRef element, CFStringRef attr, QString& out) {
     CFTypeRef value = nullptr;
     if (AXUIElementCopyAttributeValue(element, attr, &value) != kAXErrorSuccess
@@ -37,6 +44,7 @@ bool copyAxString(AXUIElementRef element, CFStringRef attr, QString& out) {
     return false;
 }
 
+// Reads an element's position and size and returns them as a QRect.
 bool copyAxRect(AXUIElementRef element, QRect& out) {
     CFTypeRef posVal = nullptr;
     CFTypeRef sizeVal = nullptr;
@@ -69,6 +77,7 @@ bool copyAxRect(AXUIElementRef element, QRect& out) {
 
 }  // namespace
 
+// Finds the frontmost app's focused window and fills in pid, names, bounds and document path.
 std::optional<ActiveWindowInfo> queryActiveWindow() {
     NSRunningApplication* frontApp =
         [[NSWorkspace sharedWorkspace] frontmostApplication];

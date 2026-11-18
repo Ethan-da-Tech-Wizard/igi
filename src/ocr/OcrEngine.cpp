@@ -1,3 +1,8 @@
+// Program: igi - OcrEngine.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Implements OcrEngine: initialises four Tesseract workers and runs OCR on horizontal image strips in parallel, merging results in reading order.
+
 #include "ocr/OcrEngine.h"
 
 #include <algorithm>
@@ -29,6 +34,7 @@ namespace igi::ocr {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Picks the tessdata directory: caller path, then the app bundle (macOS), then TESSDATA_PREFIX.
 std::string OcrEngine::resolveTessDataPath(const char* callerPath) {
     if (callerPath) return callerPath;
 
@@ -61,6 +67,7 @@ std::string OcrEngine::resolveTessDataPath(const char* callerPath) {
 // Lifecycle
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Constructor: limits the thread pool to one thread per Tesseract worker.
 OcrEngine::OcrEngine() {
     // N=4 threads: one per TessWorker. Each thread runs exclusively on its
     // assigned worker slot (dispatch is round-robin via nextWorker_), so no
@@ -68,6 +75,7 @@ OcrEngine::OcrEngine() {
     workerPool_.setMaxThreadCount(kOcrWorkers);
 }
 
+// Destructor: waits for running OCR jobs, then shuts down each Tesseract instance.
 OcrEngine::~OcrEngine() {
     workerPool_.waitForDone();
     for (auto& w : workers_) {
@@ -76,6 +84,7 @@ OcrEngine::~OcrEngine() {
     }
 }
 
+// Creates and initialises every worker; returns false if any Tesseract init fails.
 bool OcrEngine::init(const char* dataPath, const char* language) {
     initialized_.store(false);
     const std::string path = resolveTessDataPath(dataPath);
@@ -88,6 +97,7 @@ bool OcrEngine::init(const char* dataPath, const char* language) {
         if (w.api->Init(pPath, language) != 0) {
             return false;
         }
+        // Sparse-text mode suits screenshots, where text is scattered rather than in neat paragraphs.
         w.api->SetPageSegMode(tesseract::PSM_SPARSE_TEXT);
     }
     initialized_.store(true);
@@ -98,6 +108,7 @@ bool OcrEngine::init(const char* dataPath, const char* language) {
 // Strip recognition (runs on a worker thread)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Runs Tesseract on one strip and returns word boxes with Y shifted back to full-image coordinates.
 std::vector<search::WordBox> OcrEngine::recognizeStrip(PIX*  strip,
                                                         int   yOffset,
                                                         int   pageIndex,
@@ -115,6 +126,7 @@ std::vector<search::WordBox> OcrEngine::recognizeStrip(PIX*  strip,
         return results;
     }
 
+    // Walk every recognised word and record its text, box and confidence.
     tesseract::ResultIterator* it = w.api->GetIterator();
     if (it) {
         const auto level = tesseract::RIL_WORD;
@@ -148,6 +160,7 @@ std::vector<search::WordBox> OcrEngine::recognizeStrip(PIX*  strip,
 // ─────────────────────────────────────────────────────────────────────────────
 
 QFuture<std::vector<search::WordBox>>
+// Starts OCR in the background: splits the image into strips, runs them in parallel and merges the words.
 OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
     // The outer future runs on one thread from workerPool_ and fans out to
     // N concurrent sub-futures (one per horizontal strip), then merges.
@@ -165,11 +178,13 @@ OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
 
             // ── Divide image into kOcrWorkers horizontal strips ───────────
             // Equal-height bands. The last strip absorbs any remainder rows.
+            // Strip height; the last strip also takes any leftover rows.
             const int stripH = std::max(1, H / kOcrWorkers);
 
             // ── mlock the pixel buffer before dispatching ─────────────────
             // The raw PIX data must not be paged out while workers read it.
             // mlock on the Leptonica pixel words.
+            // Pin the pixel buffer in RAM so it cannot be paged out while workers read it.
             l_uint32* pixData = pixGetData(fullPix);
             const std::size_t pixBytes =
                 static_cast<std::size_t>(pixGetWpl(fullPix)) *
@@ -181,6 +196,7 @@ OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
 #endif
 
             // ── Fan out: one QtConcurrent task per strip ──────────────────
+            // Pairs a strip's future with a flag saying whether the strip was started.
             struct StripFuture {
                 QFuture<std::vector<search::WordBox>> future;
                 bool valid = false;
@@ -200,6 +216,7 @@ OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
 
                 // pixCreate a sub-pix clip (shallow: shares fullPix data).
                 // pixClipRectangle makes a deep copy — safe for concurrent use.
+                // Copy this strip out of the full image so each worker has its own buffer.
                 BOX* box = boxCreate(0, yStart, W, h);
                 if (!box) continue;
                 PIX* strip = pixClipRectangle(fullPix, box, nullptr);
@@ -243,6 +260,7 @@ OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
             }
 
             // Sort by reading order: top-to-bottom, then left-to-right.
+            // Sort by reading order: top to bottom, then left to right.
             std::sort(merged.begin(), merged.end(),
                 [](const search::WordBox& a, const search::WordBox& b) {
                     if (a.y != b.y) return a.y < b.y;
@@ -253,6 +271,7 @@ OcrEngine::recognizeAsync(PixPtr image, int pageIndex) {
             // img's PixPtr deleter will call igi_bzero + pixDestroy, but we
             // wipe and munlock here — before the deleter — to shorten the
             // window during which raw pixel PHI is in lockable RAM.
+            // Wipe the source pixels as early as possible, then unlock the memory.
             igi_bzero(pixData, pixBytes);
 #ifndef Q_OS_WIN
             if (mlockOk) ::munlock(pixData, pixBytes);

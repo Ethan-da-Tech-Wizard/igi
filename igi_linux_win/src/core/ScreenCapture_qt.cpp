@@ -1,3 +1,8 @@
+// Program: igi - ScreenCapture_qt.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Cross-platform (Qt) screen capture that grabs the focused window's screen region into an ARGB32 image.
+
 #include "core/ScreenCapture.h"
 #include "core/ActiveWindowInspector.h"
 #include "core/ScreenGeometry.h"
@@ -8,8 +13,10 @@
 
 namespace igi::core {
 
+// Qt implementation of IScreenCapture.
 class QtScreenCapture final : public IScreenCapture {
 public:
+    // Captures the focused window's pixels; returns nullopt when no window or screen can be resolved or the grab is empty.
     std::optional<CaptureResult> captureFocusedWindow() override {
         const auto active = queryActiveWindow();
         if (!active) {
@@ -59,6 +66,7 @@ public:
     }
 };
 
+// Factory returning the Qt implementation.
 std::unique_ptr<IScreenCapture> IScreenCapture::create() {
     return std::make_unique<QtScreenCapture>();
 }

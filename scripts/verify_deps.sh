@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Program: igi - verify_deps.sh
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Checks installed Homebrew dependency versions and library hashes against a lockfile, or regenerates the lockfile.
+
 # scripts/verify_deps.sh
 #
 # Dependency integrity check for CI and local dev.

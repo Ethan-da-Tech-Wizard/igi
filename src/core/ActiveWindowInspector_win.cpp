@@ -1,3 +1,8 @@
+// Program: igi - ActiveWindowInspector_win.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Windows implementation of queryActiveWindow using Win32 foreground-window, DWM and process APIs.
+
 #include "core/ActiveWindowInspector.h"
 
 #define WIN32_LEAN_AND_MEAN
@@ -12,6 +17,7 @@
 
 namespace igi::core {
 
+// Returns details of the foreground window, or nullopt when there is none.
 std::optional<ActiveWindowInfo> queryActiveWindow() {
     HWND hwnd = GetForegroundWindow();
     if (!hwnd) {

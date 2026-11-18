@@ -1,3 +1,8 @@
+// Program: igi - SearchOverlay.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares HighlightOverlay (match rectangles) and SearchOverlay (the floating search bar) widgets.
+
 #pragma once
 
 #include <vector>

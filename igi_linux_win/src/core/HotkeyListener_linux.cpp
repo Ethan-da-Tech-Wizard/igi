@@ -1,3 +1,8 @@
+// Program: igi - HotkeyListener_linux.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Linux (X11) global hotkey listener that grabs the key combination and watches for it on a background thread.
+
 #include "core/HotkeyListener.h"
 
 #include <thread>
@@ -19,6 +24,7 @@
 
 namespace igi::core {
 
+// Grabs the key on the X root window and polls for events on a worker thread.
 class X11HotkeyListener final : public IHotkeyListener {
 public:
     X11HotkeyListener() = default;
@@ -64,6 +70,7 @@ public:
     bool isRegistered() const noexcept override { return registered_; }
 
 private:
+    // Thread body: opens the display, grabs the key (with lock-key variants) and dispatches matching key presses.
     void runLoop() {
         Display* dpy = XOpenDisplay(nullptr);
         if (!dpy) {
@@ -142,6 +149,7 @@ private:
     int               pipeFds_[2] = {-1, -1};
 };
 
+// Factory: the Linux build returns the X11 listener.
 std::unique_ptr<IHotkeyListener> IHotkeyListener::create() {
     return std::make_unique<X11HotkeyListener>();
 }

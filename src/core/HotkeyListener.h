@@ -1,3 +1,8 @@
+// Program: igi - HotkeyListener.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares the IHotkeyListener interface for registering a global hotkey, plus a per-platform factory.
+
 #pragma once
 
 #include <functional>

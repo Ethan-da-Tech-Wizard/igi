@@ -1,3 +1,8 @@
+// Program: igi - main.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Application entry point: enforces a single instance, starts OCR, the capture session, overlays, tray icon and hotkey daemon, and handles shutdown signals with a secure corpus wipe.
+
 #include <csignal>
 #ifndef Q_OS_WIN
 #include <unistd.h>   // pipe(), write(), read()
@@ -35,13 +40,17 @@ extern "C" void igi_set_activation_policy_accessory();
 #endif
 
 #ifndef Q_OS_WIN
+// Self-pipe used to hand POSIX signals from the async handler over to the Qt event loop.
 static int g_sigPipe[2] = {-1, -1};
 
+// Async-signal-safe handler: only writes one byte to the pipe, doing no other work.
 static void posixSignalHandler(int /*sig*/) {
     char byte = 1;
     (void)::write(g_sigPipe[1], &byte, sizeof(byte));
 }
 
+// Creates the signal pipe and installs the handler for SIGTERM, SIGINT and SIGQUIT.
+// Returns false if the pipe could not be created.
 static bool setupSignalHandler() {
     if (::pipe(g_sigPipe) != 0) {
         qWarning() << "[igi] Failed to create signal pipe.";
@@ -60,9 +69,12 @@ static bool setupSignalHandler() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Program entry: wires every component together and runs the Qt event loop.
 int main(int argc, char* argv[]) {
+    // Run security checks first, before any sensitive data can be in memory.
     igi::core::SecurityGuard::runStartupChecks();
 
+    // Name of the local socket used to detect an already-running instance.
     const QString socketName = QStringLiteral("igi_ocr_search_single_instance_socket");
 
     // ── Single Instance Check ──
@@ -71,6 +83,7 @@ int main(int argc, char* argv[]) {
     // window manager (which causes taskbar flashing when the app exits).
     {
         int argc_copy = argc;
+        // A core (non-GUI) app is enough to talk to the socket and avoids GUI registration.
         QCoreApplication coreApp(argc_copy, argv);
         QLocalSocket clientSocket;
         clientSocket.connectToServer(socketName);
@@ -90,9 +103,11 @@ int main(int argc, char* argv[]) {
     }
 
     qDebug() << "[igi] Starting primary instance…";
+    // This is the primary instance, so create the full GUI application.
     QApplication app(argc, argv);
 
 #if defined(Q_OS_MACOS)
+    // Hide the Dock icon when running as a bare binary on macOS.
     igi_set_activation_policy_accessory();
 #endif
 
@@ -103,6 +118,7 @@ int main(int argc, char* argv[]) {
 #endif
 
     // ── OCR engine ──
+    // Create the OCR engine; the program cannot work without it, so exit on failure.
     auto ocrEngine = std::make_unique<igi::ocr::OcrEngine>();
     if (!ocrEngine->init(nullptr, "eng")) {
         qWarning() << "[igi] Tesseract initialisation failed.";
@@ -111,17 +127,21 @@ int main(int argc, char* argv[]) {
     qDebug() << "[igi] Tesseract pre-loaded.";
 
     // ── Screen capture ──
+    // Platform-specific screen capture implementation.
     auto capture = igi::core::IScreenCapture::create();
 
     // ── Search overlay ──
+    // UI widgets: the search bar and the capture flash.
     auto* overlay = new igi::ui::SearchOverlay;
     auto* flashOverlay = new igi::ui::CaptureFlashOverlay;
 
     // ── Pipeline controller ──
+    // The session ties capture, OCR, search and overlay together.
     auto* session = new igi::SearchSession(
         capture.get(), ocrEngine.get(), overlay, flashOverlay);
 
     // ── Setup Single Instance IPC Server ──
+    // Listen for activation requests from later launches of the program.
     QLocalServer localServer;
     QLocalServer::removeServer(socketName); // clean up any stale socket file
     if (localServer.listen(socketName)) {
@@ -172,6 +192,7 @@ int main(int argc, char* argv[]) {
 #endif
 
     // ── System Tray Icon (Menu Bar) ──
+    // Tray (menu bar) icon with a small informational menu and a Quit action.
     QSystemTrayIcon trayIcon;
     // Load the icon from macOS app bundle structure or from resources on other platforms.
 #if defined(Q_OS_MACOS)
@@ -200,9 +221,11 @@ int main(int argc, char* argv[]) {
     trayIcon.show();
 
     // ── Daemon (hotkey + permissions) ──
+    // The daemon owns the permission check and the global hotkey.
     igi::core::Daemon daemon;
 
     // Surface missing permissions to the user.
+    // Show a warning dialog with shortcut buttons when a permission is missing.
     QObject::connect(&daemon, &igi::core::Daemon::permissionsChecked,
         [](bool screenGranted, bool axGranted) {
             if (screenGranted && axGranted) {
@@ -244,12 +267,14 @@ int main(int argc, char* argv[]) {
         });
 
     // ── THE PIPELINE WIRE ──
+    // Pressing the hotkey starts a new capture and search session.
     QObject::connect(&daemon, &igi::core::Daemon::hotkeyTriggered,
         session, &igi::SearchSession::activate);
 
     daemon.start();
     qDebug() << "[igi] Daemon started. Listening for" << igi::core::kPlatformHotkeyLog << "…";
 
+    // Block here running the event loop until the app quits.
     int ret = app.exec();
 
     // Ensure a final secure dismiss on clean exit (user closed the app normally).

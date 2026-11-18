@@ -1,3 +1,8 @@
+// Program: igi - hotkey_listener_test.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Tests Daemon hotkey handling using a mock listener, including registration failure and permission signals.
+
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
@@ -14,6 +19,7 @@ using ::testing::Return;
 // Test double: a controllable IHotkeyListener that records calls and lets
 // tests fire the callback manually without needing real OS permissions.
 // ---------------------------------------------------------------------------
+// Mock that records calls and lets tests trigger the hotkey callback.
 class MockHotkeyListener final : public IHotkeyListener {
 public:
     MOCK_METHOD(bool, registerHotkey, (Callback callback), (override));
@@ -41,6 +47,7 @@ private:
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+// Starting the daemon registers the hotkey.
 TEST(HotkeyListener, DaemonStartRegistersHotkey) {
     auto* raw = new MockHotkeyListener();
     EXPECT_CALL(*raw, registerHotkey(_)).Times(1).WillOnce(Return(true));
@@ -54,6 +61,7 @@ TEST(HotkeyListener, DaemonStartRegistersHotkey) {
     EXPECT_TRUE(daemon.hotkeyActive());
 }
 
+// Firing the hotkey makes the daemon emit hotkeyTriggered.
 TEST(HotkeyListener, HotkeyCallbackEmitsDaemonSignal) {
     auto* raw = new MockHotkeyListener();
 
@@ -78,6 +86,7 @@ TEST(HotkeyListener, HotkeyCallbackEmitsDaemonSignal) {
     EXPECT_EQ(spy.count(), 1);
 }
 
+// Stopping the daemon unregisters the hotkey.
 TEST(HotkeyListener, DaemonStopUnregistersHotkey) {
     auto* raw = new MockHotkeyListener();
     EXPECT_CALL(*raw, registerHotkey(_)).WillOnce(Return(true));
@@ -91,6 +100,7 @@ TEST(HotkeyListener, DaemonStopUnregistersHotkey) {
     EXPECT_FALSE(daemon.isRunning());
 }
 
+// A failed registration is tolerated.
 TEST(HotkeyListener, RegistrationFailureDoesNotCrashDaemon) {
     auto* raw = new MockHotkeyListener();
     // Simulates missing Accessibility permission.
@@ -105,6 +115,7 @@ TEST(HotkeyListener, RegistrationFailureDoesNotCrashDaemon) {
     EXPECT_FALSE(daemon.hotkeyActive());
 }
 
+// permissionsChecked is emitted on each start.
 TEST(HotkeyListener, PermissionsCheckedSignalFiresOnEveryStart) {
     auto* raw = new MockHotkeyListener();
     EXPECT_CALL(*raw, registerHotkey(_)).WillOnce(Return(true));
@@ -123,6 +134,7 @@ TEST(HotkeyListener, PermissionsCheckedSignalFiresOnEveryStart) {
     EXPECT_EQ(spy[0].size(), 2) << "signal must carry the (screen, ax) pair";
 }
 
+// A start while already running does not repeat the permission check.
 TEST(HotkeyListener, RepeatedStartDoesNotRefirePermissionsCheck) {
     auto* raw = new MockHotkeyListener();
     EXPECT_CALL(*raw, registerHotkey(_)).WillOnce(Return(true));

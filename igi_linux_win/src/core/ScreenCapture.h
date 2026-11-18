@@ -1,3 +1,8 @@
+// Program: igi - ScreenCapture.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares the CaptureResult struct and the IScreenCapture interface for grabbing the focused window's pixels.
+
 #pragma once
 
 #include <memory>

@@ -1,3 +1,8 @@
+// Program: igi - CaptureFlashOverlay.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Implements the fading amber capture-flash overlay window and its painting.
+
 #include "CaptureFlashOverlay.h"
 
 #include <QPainter>
@@ -5,6 +10,7 @@
 
 namespace igi::ui {
 
+// Builds a transparent, click-through window and its fade animation.
 CaptureFlashOverlay::CaptureFlashOverlay(QWidget* parent)
     : QWidget(parent)
 {
@@ -29,11 +35,13 @@ CaptureFlashOverlay::CaptureFlashOverlay(QWidget* parent)
     connect(fadeAnim_, &QPropertyAnimation::finished, this, &QWidget::hide);
 }
 
+// Stores the opacity and repaints.
 void CaptureFlashOverlay::setFlashOpacity(qreal opacity) {
     flashOpacity_ = opacity;
     update();
 }
 
+// Places the overlay over the given rectangle and plays the flash animation.
 void CaptureFlashOverlay::flash(const QRect& screenRect) {
     if (screenRect.isEmpty()) return;
 
@@ -46,6 +54,7 @@ void CaptureFlashOverlay::flash(const QRect& screenRect) {
     fadeAnim_->start();
 }
 
+// Paints a tinted fill, an amber border and a white inner line, all scaled by the current opacity.
 void CaptureFlashOverlay::paintEvent(QPaintEvent*) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);

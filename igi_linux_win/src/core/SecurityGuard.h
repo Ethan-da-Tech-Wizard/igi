@@ -1,3 +1,8 @@
+// Program: igi - SecurityGuard.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Declares SecurityGuard, a set of startup security checks run before any sensitive data is handled.
+
 #pragma once
 
 namespace igi::core {

@@ -1,3 +1,8 @@
+// Program: igi - PlatformHotkey.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Defines the human-readable hotkey label strings used in the UI and logs for each platform.
+
 #pragma once
 
 #include <QString>

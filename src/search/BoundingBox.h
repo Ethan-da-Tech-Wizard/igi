@@ -1,3 +1,8 @@
+// Program: igi - BoundingBox.h
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Defines WordBox, the recognised word with its text, normalised text, pixel rectangle, confidence and page.
+
 #pragma once
 
 #include <QString>

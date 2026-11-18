@@ -1,3 +1,8 @@
+// Program: igi - ActiveWindowInspector_linux.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Linux (X11) implementation of queryActiveWindow: finds the active window, its bounds, process, names and any open PDF file.
+
 #include "core/ActiveWindowInspector.h"
 
 #include <cmath>
@@ -22,6 +27,7 @@
 
 namespace igi::core {
 
+// Returns details of the active X11 window, or nullopt when none can be found.
 std::optional<ActiveWindowInfo> queryActiveWindow() {
     Display* dpy = XOpenDisplay(nullptr);
     if (!dpy) {
@@ -32,6 +38,7 @@ std::optional<ActiveWindowInfo> queryActiveWindow() {
     Window active_win = 0;
 
     // Get active window using _NET_ACTIVE_WINDOW property on the root window
+    // The window manager publishes the active window on the root window.
     Atom active_window_atom = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", 0);
     Atom actual_type;
     int actual_format;
@@ -91,6 +98,7 @@ std::optional<ActiveWindowInfo> queryActiveWindow() {
         dpr = QGuiApplication::primaryScreen() ? QGuiApplication::primaryScreen()->devicePixelRatio() : 1.0;
     }
 
+    // Convert physical X11 pixels into Qt logical coordinates.
     int logX = static_cast<int>(std::round(abs_x / dpr));
     int logY = static_cast<int>(std::round(abs_y / dpr));
     int logW = static_cast<int>(std::round(attr.width / dpr));
@@ -139,6 +147,7 @@ std::optional<ActiveWindowInfo> queryActiveWindow() {
     XCloseDisplay(dpy);
 
     // Read open file descriptors of the PID to detect if a PDF is opened
+    // Look through the process's open files for a PDF; if one is found it becomes the document path.
     if (info.pid > 0) {
         QDir fdDir(QStringLiteral("/proc/%1/fd").arg(info.pid));
         if (fdDir.exists()) {

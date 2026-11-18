@@ -1,3 +1,8 @@
+// Program: igi - ScreenCapture_qt.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Cross-platform (Qt) screen capture that grabs the focused window's screen region, with several fallbacks including command-line screenshot tools and a blank synthetic image.
+
 #include <QDir>
 #include <QFileInfo>
 #include <QFile>
@@ -19,6 +24,7 @@ namespace igi::core {
 
 namespace {
 
+// Chooses the screen for a window: by centre point, by top-left, by largest overlap, else the primary screen.
 QScreen* findBestScreen(const QRect& bounds) {
     const auto screens = QGuiApplication::screens();
     if (screens.isEmpty()) {
@@ -67,8 +73,10 @@ QScreen* findBestScreen(const QRect& bounds) {
 
 } // namespace
 
+// Qt implementation of IScreenCapture.
 class QtScreenCapture final : public IScreenCapture {
 public:
+    // Captures the focused window, trying progressively broader strategies so a result is always returned.
     std::optional<CaptureResult> captureFocusedWindow() override {
         const auto active = queryActiveWindow();
 
@@ -115,6 +123,7 @@ public:
         screen.virtualGeometry = screenGeo;
 
         // Clamp bounds strictly within screen geometry
+        // Keep the capture area inside the chosen screen.
         QRect clampedBounds = bounds.intersected(screenGeo);
         if (clampedBounds.isEmpty() || clampedBounds.width() <= 0 || clampedBounds.height() <= 0) {
             clampedBounds = screenGeo;
@@ -131,6 +140,7 @@ public:
         localW = std::clamp(localW, 1, screenGeo.width() - localX);
         localH = std::clamp(localH, 1, screenGeo.height() - localY);
 
+        // Pixmap that receives the grabbed pixels.
         QPixmap pixmap;
 
         // Stage 1: Try sub-rectangle grab on target screen
@@ -247,6 +257,7 @@ public:
     }
 };
 
+// Factory returning the Qt implementation.
 std::unique_ptr<IScreenCapture> IScreenCapture::create() {
     return std::make_unique<QtScreenCapture>();
 }

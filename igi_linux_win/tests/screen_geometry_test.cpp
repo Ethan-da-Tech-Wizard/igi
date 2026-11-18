@@ -1,3 +1,8 @@
+// Program: igi - screen_geometry_test.cpp
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Tests ScreenGeometry screen lookup and logical-to-physical coordinate scaling against the available displays.
+
 #include <gtest/gtest.h>
 
 #include <QGuiApplication>
