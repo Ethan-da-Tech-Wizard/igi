@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# ==============================================================================
+# Program: verify_deps.py
+# Programmer: Ethan-da-Tech-Wizard
+# Last Modified: November 18, 2026
+# Purpose: Verifies dependency binary integrity and dynamic library SHA-256 cryptographic hashes against a locked baseline manifest to protect against supply-chain tampering.
+# ==============================================================================
+
 """
 scripts/verify_deps.sh — Dependency integrity check (Python 3, no bash 4 required).
 

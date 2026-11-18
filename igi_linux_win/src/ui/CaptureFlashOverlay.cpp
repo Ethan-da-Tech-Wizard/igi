@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: CaptureFlashOverlay.cpp
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Renders a subtle camera-shutter flash animation overlay across captured display bounds, providing immediate visual confirmation to the user upon screen capture.
+// ==============================================================================
+
 #include "CaptureFlashOverlay.h"
 
 #include <QPainter>

@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: ScreenGeometry.h
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Calculates display bounds, Retina scaling ratios, DPI conversions, and coordinate mappings between window space and physical screen pixels.
+// ==============================================================================
+
 #pragma once
 
 #include <QPointF>

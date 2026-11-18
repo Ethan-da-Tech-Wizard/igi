@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: SecureWipe.h
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Provides cryptographic memory sanitization routines, zeroing sensitive image and text buffers in RAM and pinning pages via mlock to prevent paging to swap storage.
+// ==============================================================================
+
 #pragma once
 
 #include <cstddef>   // size_t

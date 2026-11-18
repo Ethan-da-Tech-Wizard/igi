@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: main.cpp
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Application entry point initializing Qt event loops, signal handlers, local IPC listeners, system tray notifications, global hotkeys, and core background services.
+// ==============================================================================
+
 #include <QApplication>
 #include <gtest/gtest.h>
 

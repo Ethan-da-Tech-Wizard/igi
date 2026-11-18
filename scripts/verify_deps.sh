@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# Program: verify_deps.sh
+# Programmer: Ethan-da-Tech-Wizard
+# Last Modified: November 18, 2026
+# Purpose: Verifies dependency binary integrity and dynamic library SHA-256 cryptographic hashes against a locked baseline manifest to protect against supply-chain tampering.
+# ==============================================================================
+
 # scripts/verify_deps.sh
 #
 # Dependency integrity check for CI and local dev.

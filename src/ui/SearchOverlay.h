@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: SearchOverlay.h
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Implements the interactive translucent desktop overlay GUI, managing fuzzy search input, real-time result bounding box highlighting, keyboard navigation, and target click-through.
+// ==============================================================================
+
 #pragma once
 
 #include <vector>

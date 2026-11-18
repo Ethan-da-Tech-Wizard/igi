@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: ImageConverter.h
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Provides conversion utilities transforming Qt QImage pixel buffers into Leptonica PIX structures, managing format normalization, channel stripping, and memory alignment for OCR.
+// ==============================================================================
+
 #pragma once
 
 #include <memory>

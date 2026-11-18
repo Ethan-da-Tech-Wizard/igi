@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# Program: sign_and_notarize.sh
+# Programmer: Ethan-da-Tech-Wizard
+# Last Modified: November 18, 2026
+# Purpose: Executes cryptographic code signing and Apple notarization workflows, verifying code seal integrity, hardened runtime requirements, and staple tickets.
+# ==============================================================================
+
 # scripts/sign_and_notarize.sh
 #
 # Sign Igi.app and optionally notarize it for Gatekeeper-clean distribution.

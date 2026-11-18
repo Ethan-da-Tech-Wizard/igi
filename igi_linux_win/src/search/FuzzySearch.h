@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: FuzzySearch.h
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Implements high-performance approximate string matching using Wagner-Fischer dynamic programming with threshold-based early exit pruning, length heuristic filters, and top-k result ranking over OCR word boxes.
+// ==============================================================================
+
 #pragma once
 
 #include <vector>

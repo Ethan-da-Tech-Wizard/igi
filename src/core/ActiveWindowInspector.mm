@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: ActiveWindowInspector.mm
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Queries active desktop window hierarchies, identifying frontmost application process IDs, window titles, and bounding geometry across platform-specific desktop APIs.
+// ==============================================================================
+
 #include "core/ActiveWindowInspector.h"
 
 #include <QRect>

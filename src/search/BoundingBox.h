@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: BoundingBox.h
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Defines spatial bounding box geometry structures, screen coordinate transformations, normalized word box representations, and confidence metrics for OCR search hits.
+// ==============================================================================
+
 #pragma once
 
 #include <QString>

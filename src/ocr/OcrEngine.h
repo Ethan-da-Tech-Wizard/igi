@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: OcrEngine.h
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Manages the Tesseract OCR engine lifecycle, asynchronous page segmentation, worker thread pooling, character confidence filtering, and word bounding box extraction.
+// ==============================================================================
+
 #pragma once
 
 #include <array>

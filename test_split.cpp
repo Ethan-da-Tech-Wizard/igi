@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: test_split.cpp
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Automated test suite validating correctness, boundary conditions, edge cases, and performance invariants for the corresponding subsystem.
+// ==============================================================================
+
 #include <QString>
 #include <QRegularExpression>
 #include <iostream>

@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# Program: bundle.sh
+# Programmer: Ethan-da-Tech-Wizard
+# Last Modified: November 18, 2026
+# Purpose: Automates build packaging, dependency resolution, framework bundling, and installation image creation for macOS application distributions.
+# ==============================================================================
+
 # bundle.sh — Build Igi.app and optionally package it as a DMG.
 #
 # Usage:

@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: daemon_test.cpp
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Provides single-instance application lifecycle locking and local IPC communication via local domain sockets, routing activation signals to the active daemon process.
+// ==============================================================================
+
 #include <gtest/gtest.h>
 
 #include <QSignalSpy>

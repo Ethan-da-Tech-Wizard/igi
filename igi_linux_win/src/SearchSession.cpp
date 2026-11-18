@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: SearchSession.cpp
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Coordinates the complete screen search workflow lifecycle, orchestrating target window capture, background OCR processing, fuzzy query evaluation, and overlay display.
+// ==============================================================================
+
 #include "SearchSession.h"
 
 #ifdef Q_OS_WIN
