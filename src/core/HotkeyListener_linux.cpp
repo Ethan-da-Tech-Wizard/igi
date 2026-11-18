@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: HotkeyListener_linux.cpp
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Installs low-level system keyboard hooks and event taps to capture global shortcut combinations (e.g. Cmd+Shift+F / Ctrl+Shift+F) to trigger instant search sessions.
+// ==============================================================================
+
 #include "core/HotkeyListener.h"
 
 #include <thread>

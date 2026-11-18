@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: SecurityGuard.mm
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Enforces privacy policies by blacklisting sensitive application windows (password managers, banking apps, private browsing) from automated OCR screen capture.
+// ==============================================================================
+
 #include "core/SecurityGuard.h"
 
 #include <cstdlib>    // getenv

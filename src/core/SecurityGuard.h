@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: SecurityGuard.h
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Enforces privacy policies by blacklisting sensitive application windows (password managers, banking apps, private browsing) from automated OCR screen capture.
+// ==============================================================================
+
 #pragma once
 
 namespace igi::core {

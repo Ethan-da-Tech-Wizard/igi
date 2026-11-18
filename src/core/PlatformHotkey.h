@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: PlatformHotkey.h
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Defines platform-agnostic keyboard shortcut representations, modifier masks, and chord definitions across macOS, Linux, and Windows desktop environments.
+// ==============================================================================
+
 #pragma once
 
 #include <QString>

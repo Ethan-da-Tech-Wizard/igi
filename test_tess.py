@@ -1,3 +1,10 @@
+# ==============================================================================
+# Program: test_tess.py
+# Programmer: Ethan-da-Tech-Wizard
+# Last Modified: November 18, 2026
+# Purpose: Automated test suite validating correctness, boundary conditions, edge cases, and performance invariants for the corresponding subsystem.
+# ==============================================================================
+
 from PIL import Image, ImageDraw, ImageFont
 import pytesseract
 import sys

@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: Permissions.h
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Checks and requests platform-level screen recording and accessibility permissions, guiding users through system privacy authorizations required for desktop capture.
+// ==============================================================================
+
 #pragma once
 
 namespace igi::core {

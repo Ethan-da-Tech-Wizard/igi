@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: AppPolicy.mm
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Configures OS application presentation modes, such as macOS NSApplicationActivationPolicyAccessory, to allow background daemon operation without docking or menu bar clutter.
+// ==============================================================================
+
 #import <AppKit/AppKit.h>
 
 // Suppresses the Dock icon at runtime when Igi is launched as a bare binary

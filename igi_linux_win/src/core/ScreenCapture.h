@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: ScreenCapture.h
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Captures targeted window and display pixels using native OS APIs (macOS CoreGraphics and Qt QScreen), handling display scaling factors and multi-monitor layouts.
+// ==============================================================================
+
 #pragma once
 
 #include <memory>

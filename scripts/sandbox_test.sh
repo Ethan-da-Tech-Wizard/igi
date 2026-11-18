@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# Program: sandbox_test.sh
+# Programmer: Ethan-da-Tech-Wizard
+# Last Modified: November 18, 2026
+# Purpose: Validates execution behavior and permission isolation within restricted sandbox profiles, verifying proper filesystem access controls.
+# ==============================================================================
+
 # scripts/sandbox_test.sh
 #
 # D-007 write-deny sandbox test (DECISIONS.md D-007).

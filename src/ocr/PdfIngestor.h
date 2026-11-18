@@ -1,3 +1,10 @@
+// ==============================================================================
+// Program: PdfIngestor.h
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Renders and extracts textual and image data from PDF documents using Poppler integration, mapping document coordinates to visual bounding boxes for search indexing.
+// ==============================================================================
+
 #pragma once
 
 #include <memory>
