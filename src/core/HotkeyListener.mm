@@ -15,6 +15,12 @@ namespace igi::core {
 // ---------------------------------------------------------------------------
 // NSEventHotkeyListener — primary path (requires Accessibility entitlement)
 // ---------------------------------------------------------------------------
+/**
+ * Global hotkey through NSEvent monitors (macOS). Needs the Accessibility
+ * permission: without it addGlobalMonitor returns nil and registration fails.
+ * Hotkey: Cmd+Shift+9. A global monitor sees keys while OTHER apps have focus;
+ * a local monitor handles the same key while Igi itself is frontmost.
+ */
 class NSEventHotkeyListener final : public IHotkeyListener {
 public:
     ~NSEventHotkeyListener() override { unregisterHotkey(); }
@@ -27,7 +33,9 @@ public:
         callback_ = std::move(callback);
 
         // Global monitor fires when ANY other app has focus.
-        // kVK_ANSI_F = 0x03 (Carbon virtual key for F on all layouts).
+        // The key is kVK_ANSI_9 (Carbon virtual key code for "9", the same on all
+        // keyboard layouts). Earlier comments and docs say Cmd+Shift+F, which is
+        // not what the code registers: the real shortcut is Cmd+Shift+9.
         const NSUInteger requiredMods =
             NSEventModifierFlagCommand | NSEventModifierFlagShift;
 
@@ -82,6 +90,11 @@ private:
 // CarbonHotkeyListener — compiled fallback (see DECISIONS.md D-004)
 // Activate by changing IHotkeyListener::create() to return this type.
 // ---------------------------------------------------------------------------
+/**
+ * Alternative backend using Carbon RegisterEventHotKey (no Accessibility
+ * permission needed). Compiled but unused unless IHotkeyListener::create() is
+ * changed to return it (docs/DECISIONS.md D-004). Same shortcut: Cmd+Shift+9.
+ */
 class CarbonHotkeyListener final : public IHotkeyListener {
 public:
     ~CarbonHotkeyListener() override { unregisterHotkey(); }
