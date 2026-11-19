@@ -30,8 +30,10 @@ namespace igi::ui   {
 
 namespace igi {
 
-// SearchSession orchestrates a single hotkey interaction (Cmd+Ctrl+F on macOS,
-// Meta+Ctrl+F elsewhere; see PlatformHotkey.h):
+// SearchSession orchestrates a single hotkey interaction. The key actually
+// registered is Cmd+Shift+9 (macOS, HotkeyListener.mm), Ctrl+Shift+9 (Windows)
+// and Meta+Ctrl+F (Linux); the tray label in PlatformHotkey.h does not match
+// the first two (known inconsistency):
 //
 //   1. On activate() — grab the focused window's pixels (sync, main thread).
 //   2. Feed the QImage through ImageConverter → OcrEngine::recognizeAsync().
