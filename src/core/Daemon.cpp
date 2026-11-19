@@ -69,8 +69,8 @@ void Daemon::stop() {
  * Preflights the macOS permissions (Screen Recording for capture, Accessibility
  * for the global hotkey), logs what is missing, tells subscribers through
  * permissionsChecked() and then tries to register the hotkey anyway.
- * NOTE: the success message below still says "Cmd+Shift+9", an old hotkey; the
- * real shortcut is kPlatformHotkeyLabel (PlatformHotkey.h).
+ * NOTE: the success message below hard-codes "Cmd+Shift+9", which is correct
+ * only on macOS (see HotkeyListener_*.cpp for the other platforms).
  */
 void Daemon::checkAndWirePermissions() {
     permissions_ = preflightPermissions();
