@@ -27,13 +27,27 @@ import pathlib
 import json
 import datetime
 
+# Where we are and where the lockfile lives: this file is in scripts/, so the
+# lockfile deps.lock sits one level up (repository root) whatever the caller's cwd.
 SCRIPT_DIR = pathlib.Path(__file__).parent
 LOCK_FILE  = SCRIPT_DIR.parent / "deps.lock"
 
+# Homebrew formulae whose installed state is pinned. The first two are the OCR
+# libraries linked into the app (threat T-1); qt is recorded for its version only
+# (its library name does not match libqt*.dylib, so the lock holds NO_DYLIB).
 PACKAGES = ["tesseract", "leptonica", "qt"]
 
 
 def brew_prefix(pkg: str) -> str:
+    """Returns `brew --prefix <pkg>` (the install directory).
+
+    Args:
+        pkg: Homebrew formula name.
+
+    Returns:
+        The prefix path, or "" if brew fails or times out (15 s). Errors are
+        swallowed on purpose: the caller treats "" as "not found".
+    """
     try:
         r = subprocess.run(["brew", "--prefix", pkg],
                            capture_output=True, text=True, timeout=15)
@@ -43,6 +57,15 @@ def brew_prefix(pkg: str) -> str:
 
 
 def brew_version(pkg: str) -> str:
+    """Returns the installed version of a formula.
+
+    Args:
+        pkg: Homebrew formula name.
+
+    Returns:
+        The second word of `brew list --versions <pkg>`, "UNKNOWN" if the line has
+        no version, or "NOT_INSTALLED" if brew fails or lists nothing.
+    """
     try:
         r = subprocess.run(["brew", "list", "--versions", pkg],
                            capture_output=True, text=True, timeout=15)
@@ -55,6 +78,7 @@ def brew_version(pkg: str) -> str:
 
 
 def sha256_file(path: pathlib.Path) -> str:
+    """Returns the hex SHA-256 of a file, read in 64 KiB chunks so large dylibs never have to fit in memory."""
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
@@ -63,6 +87,14 @@ def sha256_file(path: pathlib.Path) -> str:
 
 
 def find_dylib(prefix: str, pkg: str) -> pathlib.Path | None:
+    """Locates a package's primary library under <prefix>/lib.
+
+    The glob lib<pkg>*.dylib can match several files (versioned names and
+    symlinks); the first real file (not a symlink) in sorted order is used.
+
+    Returns:
+        The path, or None if the lib directory or a matching file is missing.
+    """
     lib_dir = pathlib.Path(prefix) / "lib"
     if not lib_dir.is_dir():
         return None
@@ -76,6 +108,11 @@ def find_dylib(prefix: str, pkg: str) -> pathlib.Path | None:
 
 
 def collect() -> dict:
+    """Gathers {package: {version, sha256, dylib}} for every pinned package as the machine is right now.
+
+    "NO_DYLIB" is recorded when no library is found, so the lockfile written by
+    --update and a later check agree about it.
+    """
     result = {}
     for pkg in PACKAGES:
         version = brew_version(pkg)
@@ -88,6 +125,12 @@ def collect() -> dict:
 
 
 def load_lock() -> dict:
+    """Parses deps.lock into {package: {version, sha256}}.
+
+    Blank lines and lines starting with "#" are skipped; each remaining line is
+    "PACKAGE  VERSION  SHA256" separated by whitespace. A missing file gives {},
+    which main() reports as an error.
+    """
     if not LOCK_FILE.exists():
         return {}
     data = {}
@@ -102,6 +145,10 @@ def load_lock() -> dict:
 
 
 def save_lock(state: dict) -> None:
+    """Rewrites deps.lock from the given state with a header (timestamp, usage, format).
+
+    Only used by `--update`, after a deliberate dependency upgrade.
+    """
     lines = [
         "# Igi dependency lockfile",
         f"# Generated: {datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')}",
@@ -118,6 +165,16 @@ def save_lock(state: dict) -> None:
 
 
 def main() -> int:
+    """Entry point.
+
+    Without arguments: collect the installed state and compare every pinned
+    package with the lockfile (layer 1 version, layer 2/3 library SHA-256). Any
+    mismatch makes the exit code 1, which fails the CI step "Verify dependency
+    integrity". With --update: regenerate the lockfile and exit 0.
+
+    Returns:
+        0 if everything matches (or after --update), 1 otherwise.
+    """
     update_mode = "--update" in sys.argv
 
     print("==> Collecting installed dependency state…")
@@ -135,6 +192,7 @@ def main() -> int:
         print("       Run: python3 scripts/verify_deps.py --update", file=sys.stderr)
         return 1
 
+        # Counts mismatches so every problem is printed before the script exits non-zero.
     failures = 0
     print("\n==> Verifying against lockfile…")
 
@@ -146,6 +204,8 @@ def main() -> int:
         expected = lock[pkg]
         actual   = current.get(pkg, {})
 
+                # (Layer 1) The Homebrew version string must match the lock exactly; a
+                # silently upgraded or replaced formula changes it.
         # Layer 1: version.
         if actual.get("version") != expected["version"]:
             print(f"FAIL  [{pkg}] Version: expected={expected['version']} "
@@ -154,6 +214,9 @@ def main() -> int:
         else:
             print(f"PASS  [{pkg}] Version: {actual['version']}")
 
+                # (Layers 2-3) The hash of the primary library must match: detects a
+                # tampered binary even when the version string is unchanged. Missing
+                # libraries or hashes only warn, they do not fail.
         # Layer 2+3: SHA-256.
         exp_sha = expected.get("sha256", "")
         act_sha = actual.get("sha256", "")

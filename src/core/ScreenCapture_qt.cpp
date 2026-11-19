@@ -3,6 +3,28 @@
 // Programmer: Ethan-da-Tech-Wizard
 // Last Modified: November 18, 2026
 // Purpose: Captures targeted window and display pixels using native OS APIs (macOS CoreGraphics and Qt QScreen), handling display scaling factors and multi-monitor layouts.
+//
+// How it fits: this is the non-macOS implementation of IScreenCapture (the
+// macOS one is ScreenCapture.mm). It is selected at build time by CMake and
+// returned by IScreenCapture::create(); SearchSession calls
+// captureFocusedWindow() on every hotkey press. It also uses
+// queryActiveWindow() (ActiveWindowInspector_*.cpp) to find the window to
+// capture and ScreenGeometry for per-screen scale factors.
+//
+// Strategy: a chain of fallbacks so a capture is ALWAYS returned (a screenshot
+// failure must never stop the search bar from appearing):
+//   1. grab the window's rectangle with QScreen::grabWindow
+//   2. grab the whole screen and crop
+//   3. try every other screen
+//   3.5 external tools (spectacle, grim, gnome-screenshot) for Wayland, where
+//       Qt may not be allowed to grab the screen
+//   4. a dark synthetic image of the right size
+//
+// Coordinates: Qt screen/window rectangles are LOGICAL pixels; the returned
+// CaptureResult::screenRect is PHYSICAL pixels (logical x devicePixelRatio).
+//
+// Privacy: a temporary PNG written by the external tools is deleted right
+// after loading; QTemporaryFile creates it with owner-only permissions.
 // ==============================================================================
 
 #include <QDir>
@@ -24,15 +46,23 @@
 
 namespace igi::core {
 
+// Helpers private to this file.
 namespace {
 
+/**
+ * Picks the screen a window mostly belongs to.
+ * Preference order: the screen containing the window's centre, then its
+ * top-left corner, then the screen with the largest overlap, then the primary
+ * (or first) screen.
+ * @param bounds Window rectangle in logical global coordinates.
+ * @return A screen, or nullptr when there are no screens at all.
+ */
 QScreen* findBestScreen(const QRect& bounds) {
     const auto screens = QGuiApplication::screens();
     if (screens.isEmpty()) {
         return nullptr;
     }
 
-    // 1. Try screen containing center of bounds
     QPoint center = bounds.center();
     for (QScreen* s : screens) {
         if (s && s->geometry().contains(center)) {
@@ -40,14 +70,12 @@ QScreen* findBestScreen(const QRect& bounds) {
         }
     }
 
-    // 2. Try screen containing top-left of bounds
     for (QScreen* s : screens) {
         if (s && s->geometry().contains(bounds.topLeft())) {
             return s;
         }
     }
 
-    // 3. Find screen with maximum intersection area
     QScreen* bestScreen = nullptr;
     int maxArea = 0;
     for (QScreen* s : screens) {
@@ -64,7 +92,6 @@ QScreen* findBestScreen(const QRect& bounds) {
         return bestScreen;
     }
 
-    // 4. Fallback to primary screen (or first available screen)
     QScreen* primary = QGuiApplication::primaryScreen();
     if (!primary && !screens.isEmpty()) {
         primary = screens.first();
@@ -74,9 +101,22 @@ QScreen* findBestScreen(const QRect& bounds) {
 
 } // namespace
 
+/**
+ * Qt-based IScreenCapture (Linux / Windows / Wayland). Stateless; each call
+ * does the whole capture again.
+ */
 class QtScreenCapture final : public IScreenCapture {
 public:
+    /**
+     * Captures the focused window (or the primary screen if the window cannot be
+     * determined).
+     * @return Always a value in practice: the grabbed image converted to ARGB32,
+     *         its physical-pixel rectangle, the screen's metadata and the active
+     *         window's metadata (name, document path).
+     */
     std::optional<CaptureResult> captureFocusedWindow() override {
+        // Which window is focused? Not available on Wayland (security model), in which
+        // case active is empty and the whole primary screen is used.
         const auto active = queryActiveWindow();
 
         QScreen* qScreen = QGuiApplication::primaryScreen();
@@ -113,6 +153,7 @@ public:
             screen = ScreenGeometry::screenByIndex(screenIndex);
         }
 
+        // A non-positive ratio would zero-size the image below; treat it as 1.
         double dpr = screen.devicePixelRatio;
         if (dpr <= 0.0) {
             dpr = 1.0;
@@ -121,18 +162,22 @@ public:
         QRect screenGeo = (qScreen ? qScreen->geometry() : QRect(0, 0, 1920, 1080));
         screen.virtualGeometry = screenGeo;
 
-        // Clamp bounds strictly within screen geometry
+        // Clamp the bounds into the screen: a window may be partly off-screen, and
+        // grabWindow needs a rectangle inside the screen.
         QRect clampedBounds = bounds.intersected(screenGeo);
         if (clampedBounds.isEmpty() || clampedBounds.width() <= 0 || clampedBounds.height() <= 0) {
             clampedBounds = screenGeo;
         }
 
+        // Window position relative to the screen's own top-left (grabWindow uses
+        // screen-local coordinates).
         int localX = clampedBounds.x() - screenGeo.x();
         int localY = clampedBounds.y() - screenGeo.y();
         int localW = clampedBounds.width();
         int localH = clampedBounds.height();
 
-        // Ensure local coordinates are strictly within screen boundaries
+        // Ensure local coordinates are strictly within screen boundaries and sizes are
+        // at least 1 pixel (std::clamp requires lo <= hi, guaranteed by the lines above).
         localX = std::clamp(localX, 0, std::max(0, screenGeo.width() - 1));
         localY = std::clamp(localY, 0, std::max(0, screenGeo.height() - 1));
         localW = std::clamp(localW, 1, screenGeo.width() - localX);
@@ -140,17 +185,18 @@ public:
 
         QPixmap pixmap;
 
-        // Stage 1: Try sub-rectangle grab on target screen
+        // Stage 1: sub-rectangle grab of the target screen (window 0 = the whole desktop of that screen).
         if (qScreen) {
             pixmap = qScreen->grabWindow(0, localX, localY, localW, localH);
         }
 
-        // Stage 2: Fallback to full screen grab on target screen if sub-rectangle grab returned null
+        // Stage 2: some platforms refuse a sub-rectangle grab; grab the full screen and crop.
         if (pixmap.isNull() && qScreen) {
             qDebug() << "[igi] ScreenCapture: Sub-rectangle grabWindow returned null. Trying full screen grabWindow(0).";
             pixmap = qScreen->grabWindow(0);
             if (!pixmap.isNull()) {
-                // Crop target sub-rectangle from full screen pixmap
+                // Crop target sub-rectangle from the full screen pixmap. The pixmap is in
+                // physical pixels, the rectangle in logical ones, so scale by pixmap/screen size.
                 qreal scaleX = static_cast<qreal>(pixmap.width()) / static_cast<qreal>(screenGeo.width());
                 qreal scaleY = static_cast<qreal>(pixmap.height()) / static_cast<qreal>(screenGeo.height());
                 if (scaleX > 0 && scaleY > 0) {
@@ -169,7 +215,8 @@ public:
             }
         }
 
-        // Stage 3: Fallback to iterating all available screens if target screen grab failed
+        // Stage 3: the target screen failed; try every other screen and, if one works,
+        // switch the geometry bookkeeping to it.
         if (pixmap.isNull()) {
             qDebug() << "[igi] ScreenCapture: Target screen grab failed. Trying all available screens.";
             for (QScreen* s : screens) {
@@ -189,7 +236,7 @@ public:
 
         QImage image;
         
-        // Stage 3.5: Wayland Fallback using CLI tools (spectacle, grim)
+        // Stage 3.5: external tools. They capture the whole monitor, not the window.
         if (pixmap.isNull()) {
             qDebug() << "[igi] ScreenCapture: All grabWindow attempts returned null image. Trying Wayland CLI fallbacks (spectacle/grim).";
             
@@ -200,7 +247,7 @@ public:
                 tempFile.close(); // let CLI tool write to it
                 
                 int exitCode = -1;
-                // Try KDE spectacle first (-m captures the current monitor containing cursor)
+                // Try KDE spectacle first (-m captures the current monitor containing cursor), then grim (wlroots), then GNOME.
                 if (QProcess::execute("spectacle", {"-b", "-n", "-m", "-o", tempPath}) == 0) {
                     exitCode = 0;
                 } else if (QProcess::execute("grim", {tempPath}) == 0) { // Try grim for wlroots
@@ -214,11 +261,12 @@ public:
                     if (!loadedImage.isNull()) {
                         qDebug() << "[igi] ScreenCapture: CLI fallback succeeded using temp file:" << tempPath;
                         image = loadedImage;
-                        // The CLI tools capture the entire monitor, so we must reset the bounds 
+                        // The CLI tools capture the entire monitor, so we must reset the bounds
                         // to the full screen geometry to prevent double-shifting coordinates.
                         clampedBounds = screenGeo;
                     }
                 }
+                // Always delete the temporary screenshot, whether or not it loaded.
                 QFile::remove(tempPath);
             }
         }
@@ -227,17 +275,22 @@ public:
             image = pixmap.toImage();
         }
 
-        // Stage 4: Synthetic Fallback ARGB32 image so screen capture NEVER fails or returns null
+        // Stage 4: Synthetic Fallback ARGB32 image so screen capture NEVER fails or returns null.
+        // A dark grey canvas: OCR will find nothing but the overlay still works.
         if (image.isNull()) {
             qWarning() << "[igi] ScreenCapture: All grabWindow attempts returned null image. Generating fallback synthetic QImage.";
             int imgW = std::max(1, clampedBounds.width());
+            // Physical size = logical size x device pixel ratio.
             int imgH = std::max(1, clampedBounds.height());
             int physW = std::max(1, static_cast<int>(std::round(imgW * dpr)));
             int physH = std::max(1, static_cast<int>(std::round(imgH * dpr)));
+            // OCR and the overlay expect 32-bit ARGB images (see ImageConverter).
             image = QImage(physW, physH, QImage::Format_ARGB32);
             image.fill(QColor(30, 30, 30));
         } else if (image.format() != QImage::Format_ARGB32) {
             image = image.convertToFormat(QImage::Format_ARGB32);
+        // Top-left in physical pixels, used by SearchSession to map OCR boxes back to
+        // screen coordinates.
         }
 
         const QPoint topLeftPx(
@@ -252,6 +305,7 @@ public:
         result.activeWindow = windowInfo;
         return result;
     }
+/** Factory: the Qt implementation is the platform default on non-Apple builds. */
 };
 
 std::unique_ptr<IScreenCapture> IScreenCapture::create() {

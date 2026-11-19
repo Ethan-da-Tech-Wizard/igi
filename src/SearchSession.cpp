@@ -3,6 +3,31 @@
 // Programmer: Ethan-da-Tech-Wizard
 // Last Modified: November 18, 2026
 // Purpose: Coordinates the complete screen search workflow lifecycle, orchestrating target window capture, background OCR processing, fuzzy query evaluation, and overlay display.
+//
+// How it fits: main.cpp creates one SearchSession and connects the Daemon's
+// hotkeyTriggered signal to activate(). The session is the only object that
+// talks to all the others: IScreenCapture (screenshot + active-window info),
+// ImageConverter/OcrEngine (Tesseract on a background thread), PdfIngestor
+// (reads text straight from an open PDF), FuzzySearch (ranking) and the
+// SearchOverlay / CaptureFlashOverlay windows.
+//
+// Data flow for one hotkey press:
+//   activate() -> capture window -> [PDF open? ingest text : OCR async] ->
+//   corpus_ (vector of WordBox: word text + pixel rectangle) ->
+//   onQueryChanged() on every keystroke -> FuzzySearch::topK -> highlight rects.
+//
+// Coordinates: the capture is in PHYSICAL pixels; the overlay draws in LOGICAL
+// (device-independent) pixels. devicePixelRatio_ converts between them
+// (logical = physical / ratio) on Retina/HiDPI screens.
+//
+// Security design (see docs/RISK_REGISTER.md SEC-01/SEC-02, D-006): OCR text can
+// contain sensitive data, so the corpus is pinned in RAM with mlock() (no
+// swap), and dismiss() overwrites the text buffers with igi_bzero() before
+// releasing them. See the NOTE in dismiss() about copy-on-write limits.
+//
+// Known limits: the "cr" debug dump in onQueryChanged() (see there) defeats
+// the wipe; activate() uses function-local statics for re-entrancy and debounce,
+// so there is effectively one session per process.
 // ==============================================================================
 
 #include "SearchSession.h"
@@ -12,6 +37,7 @@
 #include <windows.h>
 #endif
 
+// igi_bzero: a zeroing routine the compiler may not optimise away (unlike a plain memset).
 #include "core/SecureWipe.h"   // igi_bzero (compiler-elision-proof wipe)
 #include <cmath>
 #include <QDebug>
@@ -29,6 +55,15 @@
 
 namespace igi {
 
+/**
+ * Stores the collaborators (borrowed, not owned) and connects the three
+ * signals the session reacts to. The collaborators must outlive the session.
+ * @param capture      Screenshot provider.
+ * @param ocrEngine    Initialised OCR engine.
+ * @param overlay      Search bar + highlight window.
+ * @param flashOverlay Border flash window (currently disabled in activate()).
+ * @param parent       Optional QObject owner.
+ */
 SearchSession::SearchSession(
     core::IScreenCapture* capture,
     ocr::OcrEngine*       ocrEngine,
@@ -41,30 +76,38 @@ SearchSession::SearchSession(
     , overlay_(overlay)
     , flashOverlay_(flashOverlay)
 {
-    // Wire OCR completion back to this object.
+    // OCR finished (background thread -> main thread, via the watcher).
     connect(&ocrWatcher_, &QFutureWatcher<std::vector<search::WordBox>>::finished,
             this, &SearchSession::onOcrFinished);
 
-    // Wire search-bar keystrokes to fuzzy search.
+    // Every keystroke in the search box re-runs the fuzzy search.
     connect(overlay_, &ui::SearchOverlay::queryChanged,
             this, &SearchSession::onQueryChanged);
 
-    // Wire Escape to dismiss.
+    // Escape in the overlay tears the session down and wipes the corpus.
     connect(overlay_, &ui::SearchOverlay::dismissed,
             this, &SearchSession::dismiss);
 }
 
+/**
+ * Hotkey handler: starts one capture + OCR cycle, or toggles the overlay off
+ * if it is already showing. Must run on the main (GUI) thread.
+ *
+ * Ignored (silently) when: a previous activation is still being handled
+ * (re-entrancy), a second activation arrives within 1.5 s of the previous
+ * completed one (debounce), or an OCR job is still running.
+ */
 void SearchSession::activate() {
-    // If the overlay is already open, toggle it off!
+    // The hotkey is a toggle: pressing it again while the overlay is open closes it.
     if (overlay_ && overlay_->isVisible()) {
         qDebug() << "[igi] SearchSession: Toggling overlay OFF.";
         dismiss();
         return;
     }
 
-    // ── Reentrancy Guard ──
-    // QProcess::execute runs a nested event loop which can process pending 
-    // IPC messages, causing massive recursive calls to this function.
+    // Re-entrancy guard. Capturing may run a nested event loop (e.g. QProcess::execute of
+    // spectacle/grim in the Qt capture backend) which can deliver another queued hotkey/IPC
+    // message into this very function.
     static bool isActivating = false;
     if (isActivating) {
         qDebug() << "[igi] Ignoring activation (already in progress / reentrant).";
@@ -72,7 +115,9 @@ void SearchSession::activate() {
     }
     isActivating = true;
 
-    // ── Debounce rapidly repeated activations (e.g. from held-down global shortcuts) ──
+    // Debounce: held-down or double-pressed hotkeys would otherwise start two
+    // captures. 1.5 s is longer than a typical key-repeat burst. The timer is
+    // (re)started only at the end of a full capture+OCR start.
     static QElapsedTimer lastActivation;
     if (lastActivation.isValid() && lastActivation.elapsed() < 1500) {
         qDebug() << "[igi] Ignoring duplicate activation (debounced).";
@@ -80,17 +125,21 @@ void SearchSession::activate() {
         return;
     }
     
-    // Ignore activations if an OCR job is already running in the background.
+    // A new OCR job on top of a running one would race for the same result slot.
     if (ocrWatcher_.isRunning()) {
         qDebug() << "[igi] Ignoring activation (OCR already in progress).";
         isActivating = false;
         return;
     }
 
-    // ── 1. Capture the focused window (sync, main thread) ──
+    // Step 1: capture the focused window synchronously on the main thread (the
+    // OS capture APIs require it).
     qDebug() << "[igi] SearchSession: capturing focused window…";
     auto captureResult = capture_->captureFocusedWindow();
     if (!captureResult) {
+        // Capture failed (e.g. no Screen Recording permission): fall back to a blank
+        // canvas the size of the primary screen so the search bar still appears.
+        // Defaults of 1.0 DPR and 1920x1080 cover screens that report nothing.
         qWarning() << "[igi] SearchSession: capture failed — using fallback primary screen geometry.";
         core::CaptureResult fallbackResult;
         fallbackResult.screen = core::ScreenGeometry::screenByIndex(0);
@@ -102,12 +151,14 @@ void SearchSession::activate() {
         }
         const double dpr = fallbackResult.screen.devicePixelRatio;
         const QRect& vg = fallbackResult.screen.virtualGeometry;
+        // Physical-pixel rect = logical geometry x device pixel ratio.
         fallbackResult.screenRect = QRect(
             static_cast<int>(std::round(vg.x() * dpr)),
             static_cast<int>(std::round(vg.y() * dpr)),
             static_cast<int>(std::round(vg.width() * dpr)),
             static_cast<int>(std::round(vg.height() * dpr))
         );
+        // A transparent dummy image: OCR finds no words, the overlay still works.
         QImage dummy(fallbackResult.screenRect.size(), QImage::Format_ARGB32);
         dummy.fill(Qt::transparent);
         fallbackResult.image = std::move(dummy);
@@ -116,6 +167,8 @@ void SearchSession::activate() {
         captureResult = std::move(fallbackResult);
     }
 
+    // Capture succeeded but returned an empty image: same fallback, reusing the
+    // capture's own geometry when it has any.
     if (captureResult->image.isNull() || captureResult->image.size().isEmpty()) {
         qWarning() << "[igi] SearchSession: captured image is null/empty — creating fallback dummy canvas.";
         if (captureResult->screenRect.isEmpty()) {
@@ -137,11 +190,13 @@ void SearchSession::activate() {
         captureResult->image = std::move(dummy);
     }
 
+    // Remember the geometry for later conversions in onQueryChanged().
     capturedScreenRect_ = captureResult->screenRect;
     devicePixelRatio_ = captureResult->screen.devicePixelRatio;
     if (devicePixelRatio_ <= 0) {
         devicePixelRatio_ = 1.0;
     }
+    // Inverse of the physical rect above: logical = physical / ratio (rounded).
     logicalScreenRect_ = QRect(
         static_cast<int>(std::round(static_cast<double>(capturedScreenRect_.x()) / devicePixelRatio_)),
         static_cast<int>(std::round(static_cast<double>(capturedScreenRect_.y()) / devicePixelRatio_)),
@@ -149,18 +204,25 @@ void SearchSession::activate() {
         static_cast<int>(std::round(static_cast<double>(capturedScreenRect_.height()) / devicePixelRatio_))
     );
 
-    // Flash the visual border immediately using logical coordinates (T-5 mitigation).
+    // Border flash (threat T-5 mitigation: show the user which area is being
+    // read). Disabled because it was found disruptive.
     // flashOverlay_->flash(logicalScreenRect_); // Disabled: User finds it disruptive
 
-    // ── 2. Check for open PDF document ──
+    // Step 2: if the active window has an open PDF, read its text directly; that
+    // is faster and more accurate than OCR on a screenshot.
     const QString& pdfPath = captureResult->activeWindow.documentPath;
     if (!pdfPath.isEmpty() && ocr::PdfIngestor::isAvailable() && QFile::exists(pdfPath)) {
         qDebug() << "[igi] SearchSession: open PDF document detected:" << pdfPath;
+        // Cancel any stale OCR so it cannot overwrite the PDF corpus later.
         if (ocrWatcher_.isRunning()) {
             ocrWatcher_.cancel();
             ocrWatcher_.waitForFinished();
         }
+        // The PDF path produces the corpus synchronously; no OCR watcher is involved.
         corpus_ = ocr::PdfIngestor::ingestPdf(pdfPath, ocrEngine_);
+        // Pin the pages (see mlockCorpus) then show the overlay and apply any
+        // query the user already typed. Note that the debounce timer is not
+        // restarted on this path.
         mlockCorpus();
         overlay_->activate(logicalScreenRect_);
         onQueryChanged(overlay_->query());
@@ -168,47 +230,50 @@ void SearchSession::activate() {
         return;
     }
 
-    // ── 3. Fallback: Active Viewport Screen Capture + OCR ──
+    // Step 3: fallback (no PDF): OCR the captured pixels in the background.
     const QImage& image = captureResult->image;
 
+    // The previous corpus was already wiped by dismiss() (the overlay can only be
+    // hidden through it); this clear() just guarantees the vector is empty.
     corpus_.clear();
 
+    // Tesseract works on Leptonica PIX images; convert once on the main thread.
     ocr::PixPtr pix = ocr::ImageConverter::qImageToPix(image);
     if (!pix) {
         qWarning() << "[igi] SearchSession: QImage→PIX conversion failed.";
     } else {
+        // The result is delivered to onOcrFinished() through ocrWatcher_ on the main thread.
         QFuture<std::vector<search::WordBox>> future =
             ocrEngine_->recognizeAsync(std::move(pix), 0);
         ocrWatcher_.setFuture(future);
         qDebug() << "[igi] SearchSession: OCR running in background…";
     }
 
-    // Show the search bar immediately so the user can start typing
+    // Show the search bar immediately so the user can start typing while OCR runs.
     overlay_->activate(logicalScreenRect_);
 
-    // Restart the debounce timer here.
+    // Start the debounce window now that the capture is underway.
     lastActivation.restart();
     isActivating = false;
 }
 
+/**
+ * Ends the session: wipes and releases the OCR corpus, then hides both overlays.
+ * Called by Escape in the overlay, by the toggle in activate(), and by main()
+ * on every exit path (signals, tray Quit, normal exit). Safe to call when idle.
+ */
 void SearchSession::dismiss() {
-    // ── Secure corpus wipe (D-006 / SEC-02) ─────────────────────────────────
-    //
-    // PROBLEM: corpus_.clear() releases the WordBox objects, but the QString
-    // heap buffers holding OCR-extracted text (potential PHI) are merely
-    // returned to the allocator — the bytes remain readable in freed memory
-    // until they happen to be overwritten by a future allocation.  A memory
-    // forensics tool (or a process-injection attacker) running between clear()
-    // and the next allocation can recover those strings verbatim.
-    //
-    // FIX: for every WordBox, we force QString to detach its copy-on-write
-    // buffer (data() call), then run explicit_bzero() over the raw UTF-16
-    // payload.  explicit_bzero is guaranteed NOT to be elided by the compiler
-    // (unlike memset on a dead variable), per the POSIX rationale and Apple's
-    // <string.h> documentation.  Only AFTER zeroing do we clear the vector.
+    // Secure corpus wipe (D-006 / SEC-02).
+    // corpus_.clear() alone only returns the QString buffers to the allocator; the
+    // text (potentially sensitive) stays readable in freed memory until reused.
+    // So each WordBox string is detached (data()) and overwritten with igi_bzero(),
+    // which the compiler may not remove, before the vector is cleared.
+    // NOTE: QString is copy-on-write. If another copy shares the buffer (for example
+    // the QFutureWatcher's stored result), data() detaches and only the NEW private
+    // copy is wiped, so the original may survive. munlockAndWipeCorpus() below
+    // repeats the same pass.
     for (auto& wb : corpus_) {
         if (!wb.text.isEmpty()) {
-            // data() forces detach: we now own this buffer exclusively.
             QChar* buf = wb.text.data();
             igi_bzero(buf, static_cast<size_t>(wb.text.size()) * sizeof(QChar));
         }
@@ -218,7 +283,9 @@ void SearchSession::dismiss() {
         }
     }
 
+    // Second pass plus munlock and clear (see below).
     munlockAndWipeCorpus();
+    // Forget the geometry so stale coordinates cannot be reused.
     capturedScreenRect_ = {};
     if (overlay_) {
         overlay_->hide();
@@ -230,22 +297,18 @@ void SearchSession::dismiss() {
     qDebug() << "[igi] SearchSession: dismissed — corpus securely wiped.";
 }
 
-// ── mlock / munlock helpers ───────────────────────────────────────────────────
-//
-// SEC-01 (RISK_REGISTER.md): mlock() pins pages in physical RAM so the OS
-// cannot write them to the swap file under memory pressure.  Without this,
-// even explicit_bzero() cannot guarantee the data wasn't already written to
-// the SSD in a previous page-out cycle.
-//
-// We mlock each QString's individual heap buffer because std::vector<WordBox>
-// stores WordBox objects contiguously, but each WordBox contains two QStrings
-// whose UTF-16 data lives in separate heap allocations — not in the vector's
-// own buffer. We must lock each one individually.
-//
-// mlock() is limited by the process's RLIMIT_MEMLOCK ulimit. On macOS the
-// default is ~8 MB per process, which is well above any OCR corpus for a
-// single screen. If mlock() fails we log a warning and continue — the
-// explicit_bzero wipe on dismiss() still runs as the secondary control.
+// mlock helpers. SEC-01 (RISK_REGISTER.md): mlock() pins pages in RAM so the
+// OS cannot write them to swap, where a later wipe could not reach them.
+// Each QString's heap buffer is locked separately because std::vector<WordBox>
+// stores the WordBox objects contiguously but the UTF-16 payload of each of its
+// two QStrings lives in its own allocation. mlock() is limited by
+// RLIMIT_MEMLOCK; on failure we log a warning and carry on, with the
+// bzero wipe on dismiss() as the remaining control.
+/**
+ * Pins every word buffer in the corpus in RAM (mlock on POSIX, VirtualLock on
+ * Windows) and records that it did so in corpusLocked_. Failures are counted
+ * and logged, never fatal.
+ */
 void SearchSession::mlockCorpus() {
     int failCount = 0;
     for (const auto& wb : corpus_) {
@@ -285,10 +348,13 @@ void SearchSession::mlockCorpus() {
     }
 }
 
+/**
+ * Zeroes every word buffer, unlocks the pages (only if they were locked), then
+ * releases the vector's storage. Order matters: wipe BEFORE unlock, so a page
+ * cannot be swapped out between unlocking and zeroing.
+ */
 void SearchSession::munlockAndWipeCorpus() {
-    // ── Step 1: explicit_bzero every QString buffer ──
-    // data() forces QString copy-on-write detach so we own the buffer.
-    // explicit_bzero cannot be compiler-elided (unlike memset on dead stores).
+    // Step 1: overwrite the text. data() detaches a shared QString (see the NOTE in dismiss()).
     for (auto& wb : corpus_) {
         if (!wb.text.isEmpty()) {
             QChar* buf = wb.text.data();
@@ -300,10 +366,8 @@ void SearchSession::munlockAndWipeCorpus() {
         }
     }
 
-    // ── Step 2: munlock so the OS can reclaim the pages ──
-    // We munlock AFTER zeroing, not before — if we unlocked first, the OS
-    // could theoretically page-out the zeroed page before we zero it
-    // (extremely unlikely but architecturally possible under heavy pressure).
+    // Step 2: unlock after the wipe. Unlocking first would, in theory, let the OS
+    // page out the unzeroed data under heavy memory pressure.
     if (corpusLocked_) {
         for (const auto& wb : corpus_) {
             if (!wb.text.isEmpty()) {
@@ -328,6 +392,7 @@ void SearchSession::munlockAndWipeCorpus() {
         corpusLocked_ = false;
     }
 
+    // Step 3: release the vector (shrink_to_fit actually returns the capacity).
     // ── Step 3: release the vector ──
     corpus_.clear();
     corpus_.shrink_to_fit();
@@ -335,30 +400,43 @@ void SearchSession::munlockAndWipeCorpus() {
 
 
 
+/**
+ * Slot: the background OCR finished (runs on the main thread).
+ * Takes the result, pins it in RAM before any search can happen (SEC-01), and
+ * re-runs the search with whatever the user typed while OCR was running.
+ */
 void SearchSession::onOcrFinished() {
     corpus_ = ocrWatcher_.result();
     qDebug() << "[igi] SearchSession: OCR complete," << corpus_.size() << "words extracted.";
 
-    // Pin corpus pages in RAM immediately — before any search occurs.
-    // Prevents the OS from writing PHI to the swap file (SEC-01).
     mlockCorpus();
 
-    // Re-run search with whatever the user has typed while OCR was running.
     onQueryChanged(overlay_->query());
 }
 
 
+/**
+ * Slot: the search text changed. Runs FuzzySearch::topK on the main thread
+ * (cheap enough to stay within about one frame, 16 ms) and gives the overlay
+ * highlight rectangles and match counts.
+ * @param query Current text of the search bar; empty or blank clears the highlights.
+ */
 void SearchSession::onQueryChanged(const QString& query) {
     if (corpus_.empty() || query.trimmed().isEmpty()) {
         // No corpus yet or empty query: clear highlights.
+        // Nothing to highlight yet: clear the overlay.
         overlay_->setHighlights({}, logicalScreenRect_);
         overlay_->setMatchInfo(0, 0, 0);
         return;
     }
 
-    // ── Fuzzy search (always on main thread, stays within 16 ms budget) ──
+    // At most 50 matches with a minimum score of 0.70 (see FuzzySearch.h for the score).
     const auto matches = search::FuzzySearch::topK(query, corpus_, 50, 0.70f);
 
+    // WARNING (debug code left in): when the query is exactly "cr" the whole OCR
+    // corpus is written in plain text to /tmp/igi_corpus_dump.txt. This bypasses
+    // the wipe and mlock protections above; it should be removed (see
+    // test_dump_corpus.patch, which is where it came from).
     if (query == "cr") {
         QFile f("/tmp/igi_corpus_dump.txt");
         if (f.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -369,7 +447,9 @@ void SearchSession::onQueryChanged(const QString& query) {
         }
     }
 
-    // Convert WordBox physical pixel rects to absolute logical screen rects.
+    // Convert WordBox pixel rectangles (relative to the captured window, physical
+    // pixels) to absolute logical screen coordinates: add the window origin, then
+    // divide by the device pixel ratio.
     const QPoint origin = capturedScreenRect_.topLeft();
     std::vector<QRect> highlightRects;
     highlightRects.reserve(matches.size());
@@ -377,6 +457,7 @@ void SearchSession::onQueryChanged(const QString& query) {
     int firstPage = 0;
     for (const auto& m : matches) {
         const auto& wb = m.word;
+        // Remember the first page number (PDF input only; OCR words have pageIndex 0).
         if (firstPage == 0 && wb.pageIndex > 0) {
             firstPage = wb.pageIndex;
         }
@@ -392,6 +473,7 @@ void SearchSession::onQueryChanged(const QString& query) {
             static_cast<int>(std::round(logH)));
     }
 
+    // Current-match index 0 for now; the overlay shows "n of total" and the page.
     overlay_->setHighlights(highlightRects, logicalScreenRect_);
     overlay_->setMatchInfo(0, static_cast<int>(matches.size()), firstPage);
 
