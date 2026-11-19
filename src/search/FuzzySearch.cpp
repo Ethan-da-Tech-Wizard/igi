@@ -44,7 +44,8 @@ float FuzzySearch::calculateScore(const QString& queryNorm, const QString& candi
     // dist <= (1.0 - threshold) * maxLen
     const int maxAllowedDist = static_cast<int>(std::floor((1.0f - threshold) * maxLen));
 
-    // Wagner-Fischer with row-rolling
+    // Space-optimized Wagner-Fischer algorithm using two alternating rows (prevRow, currRow)
+    // Avoids allocating full (len1+1)*(len2+1) matrix, reducing memory from O(M*N) to O(min(M,N))
     prevRow.resize(len2 + 1);
     currRow.resize(len2 + 1);
 
