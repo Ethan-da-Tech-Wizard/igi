@@ -2,7 +2,8 @@
 // Program: Daemon.h
 // Programmer: Ethan-da-Tech-Wizard
 // Last Modified: November 18, 2026
-// Purpose: Provides single-instance application lifecycle locking and local IPC communication via local domain sockets, routing activation signals to the active daemon process.
+// Purpose: Background service object: runs the macOS/Linux/Windows permission preflight and owns the global hotkey listener, emitting hotkeyTriggered() when the shortcut is pressed.
+//          (Single-instance locking and the local IPC socket are NOT here; they live in main.cpp.)
 // ==============================================================================
 
 #pragma once
@@ -17,26 +18,42 @@
 
 namespace igi::core {
 
+/**
+ * Lifecycle owner of the global hotkey.
+ *
+ * start(): preflight permissions, emit permissionsChecked(), register the
+ * hotkey, emit started(). stop(): release the hotkey, emit stopped().
+ * Hotkey presses arrive as hotkeyTriggered(), which main.cpp wires to
+ * SearchSession::activate(). Lives on the GUI thread; platform specifics are
+ * hidden behind IHotkeyListener.
+ */
 class Daemon : public QObject {
     Q_OBJECT
 
 public:
-    // Dependency injection: pass a custom listener for testing.
-    // When nullptr, the platform default (NSEventHotkeyListener) is used.
+    // Dependency injection: pass a custom listener for testing (see
+    // tests/daemon_test.cpp). When nullptr, the platform default from
+    // IHotkeyListener::create() is used.
     explicit Daemon(
         std::unique_ptr<IHotkeyListener> listener = nullptr,
         QObject* parent = nullptr);
 
     ~Daemon() override;
 
+    // True between start() and stop().
     bool isRunning()      const noexcept { return running_; }
+    // True if the OS accepted the hotkey registration.
     bool hotkeyActive()   const noexcept { return listener_ && listener_->isRegistered(); }
+    // Result of the last permission preflight (Screen Recording, Accessibility).
     PermissionStatus permissions() const noexcept { return permissions_; }
 
+    // Version string for diagnostics (currently a fixed placeholder).
     QString version() const;
 
 public slots:
+    // Idempotent. Preflights permissions, emits started() and registers the hotkey.
     void start();
+    // Idempotent. Unregisters the hotkey and emits stopped().
     void stop();
 
 signals:

@@ -29,9 +29,10 @@ class HighlightOverlay final : public QWidget {
 public:
     explicit HighlightOverlay(QRect screenRect, QWidget* parent = nullptr);
 
-    // Replace the current highlight set.  Coordinates are physical pixels
-    // in the coordinate space returned by ScreenCapture (same origin as
-    // screenRect passed to the constructor).
+    // Replace the current highlight set. Coordinates are LOGICAL global screen
+    // pixels: SearchSession converts them from the physical pixels of the
+    // capture before calling (the window is placed at screenRect, so the
+    // rectangles are drawn relative to it).
     void setHighlights(const std::vector<QRect>& rects);
 
 protected:
@@ -42,9 +43,12 @@ private:
 };
 
 // ─── SearchOverlay ───────────────────────────────────────────────────────────
-// Frameless, always-on-top search bar shown when the user presses Cmd+Shift+F.
-// Emits queryChanged() on every keystroke so the pipeline can search in
-// real-time.  Emits dismissed() when the user presses Escape.
+// Frameless, always-on-top search bar shown when the user presses the global
+// hotkey (see PlatformHotkey.h). Emits queryChanged() on every keystroke so the
+// pipeline can search in real time. Emits dismissed() when the user presses
+// Escape or switches to another application. nextMatchRequested() and
+// prevMatchRequested() (Down/Enter, Up) are emitted but not connected to
+// anything yet.
 class SearchOverlay final : public QWidget {
     Q_OBJECT
 public:
@@ -54,8 +58,8 @@ public:
     void activate(const QRect& targetScreen);
 
     // Update the yellow highlight rectangles painted over the captured window.
-    // screenRect is the physical-pixel rect of the captured window (used to
-    // position the HighlightOverlay).
+    // rects and screenRect are LOGICAL global screen coordinates; screenRect is
+    // the area of the captured window and is used to position the HighlightOverlay.
     void setHighlights(const std::vector<QRect>& rects, QRect screenRect);
 
     // Set match summary counter (e.g., "1 of 14 (Page 42)").

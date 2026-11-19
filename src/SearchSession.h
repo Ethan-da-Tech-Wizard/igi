@@ -30,7 +30,8 @@ namespace igi::ui   {
 
 namespace igi {
 
-// SearchSession orchestrates a single Cmd+Shift+F interaction:
+// SearchSession orchestrates a single hotkey interaction (Cmd+Ctrl+F on macOS,
+// Meta+Ctrl+F elsewhere; see PlatformHotkey.h):
 //
 //   1. On activate() — grab the focused window's pixels (sync, main thread).
 //   2. Feed the QImage through ImageConverter → OcrEngine::recognizeAsync().
@@ -40,7 +41,8 @@ namespace igi {
 //   5. On dismiss() or a new activate() call, clear everything (RAII).
 //
 // The session object is reused across invocations.  All sensitive data
-// is held only in-scope; dismissal drops the corpus vector.
+// is held only in-scope; dismissal overwrites the corpus text and then drops the
+// corpus vector (see SearchSession::dismiss for the wipe and its limits).
 class SearchSession : public QObject {
     Q_OBJECT
 public:
@@ -51,17 +53,22 @@ public:
         ui::CaptureFlashOverlay* flashOverlay,
         QObject* parent = nullptr);
 
-    // Trigger a new capture+OCR cycle.  Safe to call from the main thread.
+    // Trigger a new capture+OCR cycle (or toggle the overlay off if it is open).
+    // Must be called on the main (GUI) thread; connected to Daemon::hotkeyTriggered
+    // and to the single-instance IPC "ACTIVATE" message in main.cpp.
     void activate();
 
-    // Tear down the current session: drop the corpus, hide the overlay.
+    // Tear down the current session: securely wipe and drop the corpus, hide both overlays.
     void dismiss();
 
 private slots:
+    // Background OCR finished: take the result as the corpus and re-run the search.
     void onOcrFinished();
+    // The search text changed: run the fuzzy search and update the highlights.
     void onQueryChanged(const QString& query);
 
 private:
+    // Collaborators, borrowed (not owned); main() keeps them alive for the whole run.
     core::IScreenCapture*   capture_;
     ocr::OcrEngine*         ocrEngine_;
     ui::SearchOverlay*      overlay_;
