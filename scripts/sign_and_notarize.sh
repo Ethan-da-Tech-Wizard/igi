@@ -70,20 +70,24 @@ find "${BUNDLE}/Contents/Frameworks" -type d -name "*.framework" 2>/dev/null | w
              "${fmwk}" 2>/dev/null || true
 done
 
-# Sign options
-SIGN_OPTS=()
-if [[ "${SIGNING_IDENTITY}" != "-" ]]; then
-    SIGN_OPTS+=(--options runtime --timestamp)
-fi
-
 # Sign the main bundle.
-codesign \
-    --force \
-    --deep \
-    --sign "${SIGNING_IDENTITY}" \
-    --entitlements "${ENTITLEMENTS}" \
-    "${SIGN_OPTS[@]}" \
-    "${BUNDLE}"
+if [[ "${SIGNING_IDENTITY}" != "-" ]]; then
+    codesign \
+        --force \
+        --deep \
+        --sign "${SIGNING_IDENTITY}" \
+        --entitlements "${ENTITLEMENTS}" \
+        --options runtime \
+        --timestamp \
+        "${BUNDLE}"
+else
+    codesign \
+        --force \
+        --deep \
+        --sign "${SIGNING_IDENTITY}" \
+        --entitlements "${ENTITLEMENTS}" \
+        "${BUNDLE}"
+fi
 
 echo "==> Codesign complete."
 codesign --verify --deep --strict "${BUNDLE}" && echo "==> Verification: OK"
