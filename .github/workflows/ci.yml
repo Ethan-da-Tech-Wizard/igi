@@ -131,10 +131,7 @@ jobs:
 
       # ── Notarize (only on push to main AND if secrets are configured) ────────
       - name: Notarize and staple
-        if: >
-          github.event_name == 'push' &&
-          github.ref == 'refs/heads/main' &&
-          secrets.APPLE_ID != ''
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID:               ${{ secrets.APPLE_ID }}
