@@ -128,11 +128,13 @@ if [[ "${DO_NOTARIZE}" -eq 1 ]]; then
         "${DMG}"
 
     # ── Step 3: Notarize ─────────────────────────────────────────────────────
-    echo "==> Submitting ${DMG} to Apple Notary Service…"
+    if [[ -z "${APPLE_ID:-}" || -z "${APPLE_APP_PASSWORD:-}" || -z "${APPLE_TEAM_ID:-}" ]]; then
+        echo "==> Apple notarization secrets not configured. Skipping Notary Service submission."
+        echo "==> DMG created successfully at: ${DMG}"
+        exit 0
+    fi
 
-    : "${APPLE_ID:?APPLE_ID env var required for notarization}"
-    : "${APPLE_APP_PASSWORD:?APPLE_APP_PASSWORD env var required}"
-    : "${APPLE_TEAM_ID:?APPLE_TEAM_ID env var required}"
+    echo "==> Submitting ${DMG} to Apple Notary Service…"
 
     xcrun notarytool submit "${DMG}" \
         --apple-id      "${APPLE_ID}" \

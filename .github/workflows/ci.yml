@@ -133,7 +133,8 @@ jobs:
       - name: Notarize and staple
         if: >
           github.event_name == 'push' &&
-          github.ref == 'refs/heads/main'
+          github.ref == 'refs/heads/main' &&
+          secrets.APPLE_ID != ''
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID:               ${{ secrets.APPLE_ID }}
