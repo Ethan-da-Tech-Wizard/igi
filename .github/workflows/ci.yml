@@ -76,7 +76,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install runtime dependencies
-        run: brew install tesseract leptonica poppler
+        run: brew install qt webp tesseract leptonica poppler
 
       - name: Download built bundle
         uses: actions/download-artifact@v4

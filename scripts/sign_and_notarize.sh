@@ -59,6 +59,26 @@ echo "==> Signing ${BUNDLE} with identity: '${SIGNING_IDENTITY}'"
 # Remove build leftovers that confuse codesign
 find "${BUNDLE}" -name "*.prl" -delete 2>/dev/null || true
 
+# Ensure all transitively referenced dylibs in Contents/Frameworks are bundled
+BREW_PREFIX="$(brew --prefix 2>/dev/null || echo '/opt/homebrew')"
+if [[ -d "${BUNDLE}/Contents/Frameworks" ]]; then
+    for dep in libsharpyuv.0.dylib libwebp.7.dylib libwebpmux.3.dylib; do
+        if [[ ! -f "${BUNDLE}/Contents/Frameworks/${dep}" ]]; then
+            src="$(find "${BREW_PREFIX}" -name "${dep}" 2>/dev/null | head -n 1 || true)"
+            if [[ -n "${src}" && -f "${src}" ]]; then
+                echo "==> Bundling missing framework dependency: ${dep} from ${src}"
+                cp -f "${src}" "${BUNDLE}/Contents/Frameworks/"
+            fi
+        fi
+    done
+fi
+
+# Ensure rpaths point to bundled Frameworks directory and homebrew lib
+if [[ -f "${BUNDLE}/Contents/MacOS/igi" ]]; then
+    install_name_tool -add_rpath "@executable_path/../Frameworks" "${BUNDLE}/Contents/MacOS/igi" 2>/dev/null || true
+    install_name_tool -add_rpath "${BREW_PREFIX}/lib" "${BUNDLE}/Contents/MacOS/igi" 2>/dev/null || true
+fi
+
 # Sign all dylibs and frameworks inside the bundle first (inside-out rule).
 find "${BUNDLE}/Contents" \( -name "*.dylib" -o -name "*.so" \) 2>/dev/null | while read -r lib; do
     codesign --force --sign "${SIGNING_IDENTITY}" \
