@@ -53,12 +53,16 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: ctest --output-on-failure
 
+      # Archive bundle preserving symbolic links (critical for Qt frameworks)
+      - name: Archive bundle artifact
+        run: tar -czf igi-app-unsigned.tar.gz -C build igi.app
+
       # Upload the built bundle so the next job can use it without rebuilding.
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
           name: igi-app-unsigned
-          path: build/igi.app
+          path: igi-app-unsigned.tar.gz
           retention-days: 1
 
 # ── Job 2: bundle, sign (ad-hoc in CI), and D-007 sandbox test ───────────────
@@ -75,11 +79,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: igi-app-unsigned
-          path: build/igi.app
 
-      # Restore executable bit lost during artifact round-trip.
-      - name: Restore executable permissions
-        run: chmod +x build/igi.app/Contents/MacOS/igi
+      - name: Extract bundle
+        run: |
+          mkdir -p build
+          tar -xzf igi-app-unsigned.tar.gz -C build
+          chmod +x build/igi.app/Contents/MacOS/igi
 
       # ── Signing ─────────────────────────────────────────────────────────────
       # In CI we always sign ad-hoc ("-") unless a Developer ID cert is

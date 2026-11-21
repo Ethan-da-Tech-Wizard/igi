@@ -56,13 +56,25 @@ fi
 # ── Step 1: Codesign ─────────────────────────────────────────────────────────
 echo "==> Signing ${BUNDLE} with identity: '${SIGNING_IDENTITY}'"
 
+# Remove build leftovers that confuse codesign
+find "${BUNDLE}" -name "*.prl" -delete 2>/dev/null || true
+
 # Sign all dylibs and frameworks inside the bundle first (inside-out rule).
-find "${BUNDLE}/Contents/Frameworks" -name "*.dylib" -o -name "*.framework" \
-  2>/dev/null | while read -r lib; do
+find "${BUNDLE}/Contents" \( -name "*.dylib" -o -name "*.so" \) 2>/dev/null | while read -r lib; do
     codesign --force --sign "${SIGNING_IDENTITY}" \
-             --timestamp \
              "${lib}" 2>/dev/null || true
 done
+
+find "${BUNDLE}/Contents/Frameworks" -type d -name "*.framework" 2>/dev/null | while read -r fmwk; do
+    codesign --force --sign "${SIGNING_IDENTITY}" \
+             "${fmwk}" 2>/dev/null || true
+done
+
+# Sign options
+SIGN_OPTS=()
+if [[ "${SIGNING_IDENTITY}" != "-" ]]; then
+    SIGN_OPTS+=(--options runtime --timestamp)
+fi
 
 # Sign the main bundle.
 codesign \
@@ -70,8 +82,7 @@ codesign \
     --deep \
     --sign "${SIGNING_IDENTITY}" \
     --entitlements "${ENTITLEMENTS}" \
-    --options runtime \
-    --timestamp \
+    "${SIGN_OPTS[@]}" \
     "${BUNDLE}"
 
 echo "==> Codesign complete."
