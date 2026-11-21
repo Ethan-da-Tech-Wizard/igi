@@ -108,11 +108,15 @@ public:
         const CGWindowID wid = findCgWindowFor(*active);
         if (wid == kCGNullWindowID) return std::nullopt;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#pragma clang diagnostic ignored "-Wunguarded-availability"
         CGImageRef cg = CGWindowListCreateImage(
             CGRectNull,
             kCGWindowListOptionIncludingWindow,
             wid,
             kCGWindowImageBoundsIgnoreFraming | kCGWindowImageBestResolution);
+#pragma clang diagnostic pop
         if (!cg) return std::nullopt;
 
         QImage image = cgImageToQImage(cg);

@@ -9,7 +9,7 @@ on:
 # ── Job 1: build + unit tests ─────────────────────────────────────────────────
 jobs:
   build-and-test:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 30
 
     steps:
@@ -35,7 +35,7 @@ jobs:
         run: python3 scripts/verify_deps.py || python3 scripts/verify_deps.py --update
 
       - name: Configure
-        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0
 
       - name: Build
         env:
@@ -58,7 +58,7 @@ jobs:
 
 # ── Job 2: bundle, sign (ad-hoc in CI), and D-007 sandbox test ───────────────
   bundle-sign-sandbox:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 20
     needs: build-and-test
 
@@ -154,7 +154,7 @@ jobs:
           sudo apt-get install -y cmake qt6-base-dev libtesseract-dev libleptonica-dev libx11-dev libxtst-dev libpng-dev libgl1-mesa-dev libgtest-dev libgmock-dev tesseract-ocr-eng
 
       - name: Configure
-        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DIGI_BUILD_TESTS=ON
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DIGI_BUILD_TESTS=ON
 
       - name: Build
         env:
