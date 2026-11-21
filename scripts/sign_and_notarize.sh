@@ -106,6 +106,7 @@ else
         --deep \
         --sign "${SIGNING_IDENTITY}" \
         --entitlements "${ENTITLEMENTS}" \
+        --options runtime \
         "${BUNDLE}"
 fi
 
