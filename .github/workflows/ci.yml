@@ -19,13 +19,18 @@ jobs:
       - name: Install dependencies
         run: |
           brew update
-          brew install cmake qt tesseract leptonica pkg-config googletest
+          brew install cmake qt tesseract tesseract-lang leptonica pkg-config googletest
 
       - name: Export Qt and pkg-config paths
         run: |
           QT_PREFIX="$(brew --prefix qt)"
           echo "CMAKE_PREFIX_PATH=${QT_PREFIX}" >> "$GITHUB_ENV"
           echo "PKG_CONFIG_PATH=$(brew --prefix tesseract)/lib/pkgconfig:$(brew --prefix leptonica)/lib/pkgconfig" >> "$GITHUB_ENV"
+          TESS_DIR="$(brew --prefix tesseract-lang 2>/dev/null)/share/tessdata"
+          if [ ! -d "$TESS_DIR" ]; then
+            TESS_DIR="$(brew --prefix tesseract 2>/dev/null)/share/tessdata"
+          fi
+          echo "TESSDATA_PREFIX=${TESS_DIR}" >> "$GITHUB_ENV"
 
       # ── Dependency integrity check (T-1: poisoned Homebrew formula) ──────────
       # Verifies that installed tesseract/leptonica versions and dylib SHA-256
@@ -46,6 +51,7 @@ jobs:
         working-directory: build
         env:
           QT_QPA_PLATFORM: offscreen
+          TESSDATA_PREFIX: ${{ env.TESSDATA_PREFIX }}
         run: ctest --output-on-failure
 
       # Upload the built bundle so the next job can use it without rebuilding.
@@ -165,4 +171,5 @@ jobs:
         working-directory: build
         env:
           QT_QPA_PLATFORM: offscreen
+          TESSDATA_PREFIX: ${{ env.TESSDATA_PREFIX }}
         run: ctest --output-on-failure
