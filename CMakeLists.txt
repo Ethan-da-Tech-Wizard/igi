@@ -112,6 +112,14 @@ target_include_directories(igi_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+if(APPLE)
+    target_include_directories(igi_core SYSTEM PUBLIC
+        /opt/homebrew/include
+        /usr/local/include
+    )
+    target_compile_options(igi_core PRIVATE -Wno-deprecated-declarations -Wno-unguarded-availability)
+endif()
+
 target_include_directories(igi_core SYSTEM PUBLIC
     ${TESSERACT_INCLUDE_DIRS}
     ${LEPTONICA_INCLUDE_DIRS}
