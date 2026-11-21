@@ -59,10 +59,14 @@ echo "    Scratch: ${SCRATCH}"
 VIOLATION_LOG="${SCRATCH}/sandbox.log"
 
 set +e
-sandbox-exec \
-    -f "${PROFILE}" \
-    -D "SCRATCH_DIR=${SCRATCH}" \
-    /usr/bin/timeout 3 "${BINARY}" \
+python3 -c '
+import subprocess, sys
+try:
+    res = subprocess.run(["sandbox-exec", "-f", sys.argv[1], "-D", "SCRATCH_DIR=" + sys.argv[2], sys.argv[3]], timeout=3)
+    sys.exit(res.returncode)
+except subprocess.TimeoutExpired:
+    sys.exit(124)
+' "${PROFILE}" "${SCRATCH}" "${BINARY}" \
     > "${SCRATCH}/igi_stdout.log" \
     2> "${SCRATCH}/igi_stderr.log"
 EXIT_CODE=$?
