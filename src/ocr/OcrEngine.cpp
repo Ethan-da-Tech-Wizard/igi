@@ -37,6 +37,7 @@
 
 // QtConcurrent provides run() for the thread pool and QFuture results.
 #include <QtConcurrent>
+#include <QDir>
 
 #if defined(Q_OS_MACOS)
 #  include <CoreFoundation/CoreFoundation.h>
@@ -67,8 +68,15 @@ namespace igi::ocr {
 std::string OcrEngine::resolveTessDataPath(const char* callerPath) {
     if (callerPath) return callerPath;
 
+    // Priority 1: explicit TESSDATA_PREFIX env var if directory exists.
+    if (const char* env = std::getenv("TESSDATA_PREFIX")) {
+        if (QDir(QString::fromLocal8Bit(env)).exists()) {
+            return env;
+        }
+    }
+
 #if defined(Q_OS_MACOS)
-    // Priority 1: app bundle Resources/tessdata.
+    // Priority 2: app bundle Resources/tessdata (packaged self-contained app).
     CFBundleRef bundle = CFBundleGetMainBundle();
     if (bundle) {
         CFURLRef resURL = CFBundleCopyResourcesDirectoryURL(bundle);
@@ -77,17 +85,37 @@ std::string OcrEngine::resolveTessDataPath(const char* callerPath) {
             if (CFURLGetFileSystemRepresentation(resURL, true,
                     reinterpret_cast<UInt8*>(pathBuf), sizeof(pathBuf))) {
                 CFRelease(resURL);
-                return std::string(pathBuf) + "/tessdata";
+                std::string candidate = std::string(pathBuf) + "/tessdata";
+                if (QDir(QString::fromStdString(candidate)).exists()) {
+                    return candidate;
+                }
+            } else {
+                CFRelease(resURL);
             }
-            CFRelease(resURL);
+        }
+    }
+
+    // Priority 3: standard Homebrew tessdata paths on macOS.
+    for (const char* p : {"/opt/homebrew/share/tessdata", "/usr/local/share/tessdata"}) {
+        if (QDir(QString::fromLocal8Bit(p)).exists()) {
+            return p;
         }
     }
 #endif
 
-    // Priority 2: TESSDATA_PREFIX env var (Homebrew default).
-    if (const char* env = std::getenv("TESSDATA_PREFIX")) {
-        return env;
+#if defined(Q_OS_LINUX)
+    // Priority 3: standard distribution tessdata paths on Linux.
+    for (const char* p : {
+        "/usr/share/tesseract-ocr/5/tessdata",
+        "/usr/share/tesseract-ocr/4.00/tessdata",
+        "/usr/share/tessdata",
+        "/usr/local/share/tessdata"
+    }) {
+        if (QDir(QString::fromLocal8Bit(p)).exists()) {
+            return p;
+        }
     }
+#endif
 
     return {};   // Empty → Tesseract uses its compiled-in default.
 }

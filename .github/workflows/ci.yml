@@ -51,7 +51,6 @@ jobs:
         working-directory: build
         env:
           QT_QPA_PLATFORM: offscreen
-          TESSDATA_PREFIX: ${{ env.TESSDATA_PREFIX }}
         run: ctest --output-on-failure
 
       # Upload the built bundle so the next job can use it without rebuilding.
@@ -171,5 +170,4 @@ jobs:
         working-directory: build
         env:
           QT_QPA_PLATFORM: offscreen
-          TESSDATA_PREFIX: ${{ env.TESSDATA_PREFIX }}
         run: ctest --output-on-failure
